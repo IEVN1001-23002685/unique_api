@@ -156,9 +156,8 @@ def actualizar(diseno_id: int, datos: dict, usuario_id: int, ip=None) -> dict:
         if "hilos" in datos:
             hilos = _validar_hilos(datos["hilos"])
             _reemplazar_hilos(diseno_id, hilos)
-            if hilos:
-                diseno.estado = "DIGITALIZADO"
-                cambios["estado"] = "DIGITALIZADO"
+            diseno.estado = "DIGITALIZADO" if hilos else "PENDIENTE"
+            cambios["estado"] = diseno.estado
         elif "estado" in datos:
             estado = datos["estado"]
             if estado == "DIGITALIZADO" and not _hilos(diseno_id):

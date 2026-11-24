@@ -14,7 +14,7 @@ from app.models import (
     CategoriaProducto,
     CarritoLinea,
     Color,
-    DevolucionEvidencia,
+    DevolucionLinea,
     Merma,
     MovimientoProducto,
     OrdenProduccionLinea,
@@ -165,7 +165,14 @@ def _crear_variantes(
             )
         ).scalars().first()
         if receta is None:
-            receta_service.crear_borrador(producto.id, talla.id, usuario_id)
+            if not db.session.scalar(
+                select(func.count()).select_from(Receta).where(
+                    Receta.producto_id == producto.id,
+                    Receta.talla_id == talla.id,
+                    Receta.estado == "BORRADOR",
+                )
+            ):
+                receta_service.crear_borrador(producto.id, talla.id, usuario_id)
         for color in colores:
             clave = (producto.id, talla.id, color.id)
             if clave in existentes:
@@ -316,8 +323,12 @@ def crear_producto(datos: dict, usuario_id: int, ip=None) -> dict:
             tallas,
             colores,
             usuario_id,
-            datos.get("stock_minimo", 5),
-            datos.get("cantidad_reposicion", 20),
+            datos.get(
+                "stock_minimo", valor_entero("stock_minimo_variante", 5)
+            ),
+            datos.get(
+                "cantidad_reposicion", valor_entero("cantidad_reposicion_variante", 20)
+            ),
         )
         registrar_bitacora(
             usuario_id,
@@ -405,8 +416,15 @@ def actualizar(producto_id: int, datos: dict, usuario_id: int, ip=None) -> dict:
                 usuario_id, "PRODUCTO_ACTUALIZADO", "producto", producto.id, cambios, ip
             )
         if "colores" in datos or "tallas" in datos:
+            actuales = db.session.execute(
+                select(VarianteProducto).where(VarianteProducto.producto_id == producto_id)
+            ).scalars().all()
+            tallas_actuales = sorted({variante.talla.codigo for variante in actuales})
+            colores_actuales = sorted({variante.color.codigo for variante in actuales})
             categoria, tallas, colores = _catalogos(
-                producto.categoria_id, datos.get("colores"), datos.get("tallas")
+                producto.categoria_id,
+                datos.get("colores", colores_actuales),
+                datos.get("tallas", tallas_actuales),
             )
             creadas = _crear_variantes(
                 producto,
@@ -440,11 +458,22 @@ def _tiene_historial(producto_id: int) -> bool:
         select(func.count()).select_from(VentaLinea).where(VentaLinea.variante_id.in_(variantes))
     ):
         return True
-    for modelo in (MovimientoProducto, Merma, OrdenProduccionLinea, CarritoLinea, DevolucionEvidencia):
+    for modelo in (MovimientoProducto, Merma, OrdenProduccionLinea, CarritoLinea):
         if db.session.scalar(
             select(func.count()).select_from(modelo).where(modelo.variante_id.in_(variantes))
         ):
             return True
+    if db.session.scalar(
+        select(func.count())
+        .select_from(DevolucionLinea)
+        .join(VentaLinea, VentaLinea.id == DevolucionLinea.venta_linea_id)
+        .where(VentaLinea.variante_id.in_(variantes))
+    ) or db.session.scalar(
+        select(func.count())
+        .select_from(DevolucionLinea)
+        .where(DevolucionLinea.variante_cambio_id.in_(variantes))
+    ):
+        return True
     if db.session.scalar(
         select(func.count()).select_from(Receta).where(
             Receta.producto_id == producto_id, Receta.estado != "BORRADOR"
@@ -524,9 +553,9 @@ def _guardar_archivo(archivo) -> tuple:
 
 def agregar_imagen(producto_id: int, archivo, usuario_id: int, ip=None, datos=None) -> dict:
     datos = datos or {}
+    nombre = None
     try:
         producto = _obtener_producto(producto_id)
-        nombre, url = _guardar_archivo(archivo)
         color_id = None
         if datos.get("color"):
             color = db.session.execute(
@@ -535,6 +564,7 @@ def agregar_imagen(producto_id: int, archivo, usuario_id: int, ip=None, datos=No
             if color is None:
                 raise ApiError("COLOR_NO_ENCONTRADO", "Color no encontrado", 404)
             color_id = color.id
+        nombre, url = _guardar_archivo(archivo)
         imagen = ProductoImagen(
             producto_id=producto.id,
             color_id=color_id,
@@ -554,6 +584,12 @@ def agregar_imagen(producto_id: int, archivo, usuario_id: int, ip=None, datos=No
         db.session.commit()
     except Exception:
         db.session.rollback()
+        if nombre:
+            directorio = current_app.config.get("UPLOAD_FOLDER") or "/var/lib/unique/uploads"
+            try:
+                os.remove(os.path.join(directorio, nombre))
+            except OSError:
+                pass
         raise
     return {
         "id": imagen.id,
@@ -599,7 +635,12 @@ def activar(producto_id: int, usuario_id: int, ip=None) -> dict:
             )
         ):
             raise ApiError("IMAGEN_REQUERIDA", "Se requiere al menos una imagen", 422)
-        categoria, tallas, _ = _catalogos(producto.categoria_id)
+        tallas = db.session.execute(
+            select(Talla)
+            .join(VarianteProducto, VarianteProducto.talla_id == Talla.id)
+            .where(VarianteProducto.producto_id == producto_id)
+            .distinct()
+        ).scalars().all()
         faltantes = []
         for talla in tallas:
             vigente = db.session.scalar(

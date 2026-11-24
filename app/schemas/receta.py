@@ -21,16 +21,24 @@ class RecetaFiltrosSchema(Schema):
 class RecetaCrearSchema(Schema):
     producto_id = fields.Int(required=True, validate=validate.Range(min=1))
     talla_id = fields.Int(required=True, validate=validate.Range(min=1))
-    mano_obra = fields.Decimal(as_string=True, places=2, load_default=0)
-    costo_bordado = fields.Decimal(as_string=True, places=2, load_default=0)
-    costos_indirectos = fields.Decimal(as_string=True, places=2, load_default=0)
+    mano_obra = fields.Decimal(
+        as_string=True, places=2, load_default=0, validate=validate.Range(min=0)
+    )
+    costo_bordado = fields.Decimal(
+        as_string=True, places=2, load_default=0, validate=validate.Range(min=0)
+    )
+    costos_indirectos = fields.Decimal(
+        as_string=True, places=2, load_default=0, validate=validate.Range(min=0)
+    )
     nota = fields.Str(allow_none=True, validate=validate.Length(max=1000))
 
 
 class RecetaActualizarSchema(Schema):
-    mano_obra = fields.Decimal(as_string=True, places=2)
-    costo_bordado = fields.Decimal(as_string=True, places=2)
-    costos_indirectos = fields.Decimal(as_string=True, places=2)
+    mano_obra = fields.Decimal(as_string=True, places=2, validate=validate.Range(min=0))
+    costo_bordado = fields.Decimal(as_string=True, places=2, validate=validate.Range(min=0))
+    costos_indirectos = fields.Decimal(
+        as_string=True, places=2, validate=validate.Range(min=0)
+    )
     nota = fields.Str(allow_none=True, validate=validate.Length(max=1000))
 
 
@@ -52,21 +60,29 @@ class RecetaLineaCrearSchema(Schema):
             raise ValidationError("Indique material_id o diseno_id, pero no ambos")
         if material_id and datos.get("cantidad_neta") is None:
             raise ValidationError({"cantidad_neta": ["Se requiere la cantidad neta"]})
-        if material_id and datos.get("cantidad_neta") is not None and datos["cantidad_neta"] < 0:
-            raise ValidationError({"cantidad_neta": ["No puede ser negativa"]})
+        if material_id and datos.get("cantidad_neta") is not None and datos["cantidad_neta"] <= 0:
+            raise ValidationError({"cantidad_neta": ["Debe ser mayor a cero"]})
         if material_id and datos.get("factor_consumo") is not None and datos["factor_consumo"] <= 0:
             raise ValidationError({"factor_consumo": ["Debe ser mayor a cero"]})
-        if material_id and datos.get("merma_pct") is not None and datos["merma_pct"] >= 100:
-            raise ValidationError({"merma_pct": ["Debe ser menor a 100"]})
+        if material_id and datos.get("merma_pct") is not None and not 0 <= datos["merma_pct"] < 100:
+            raise ValidationError({"merma_pct": ["Debe estar entre 0 y 100"]})
 
 
 class RecetaPrevisualizarSchema(Schema):
     producto_id = fields.Int(required=True, validate=validate.Range(min=1))
     talla_id = fields.Int(required=True, validate=validate.Range(min=1))
-    mano_obra = fields.Decimal(as_string=True, places=2, load_default=0)
-    costo_bordado = fields.Decimal(as_string=True, places=2, load_default=0)
-    costos_indirectos = fields.Decimal(as_string=True, places=2, load_default=0)
-    precio_venta = fields.Decimal(as_string=True, places=2, allow_none=True)
+    mano_obra = fields.Decimal(
+        as_string=True, places=2, load_default=0, validate=validate.Range(min=0)
+    )
+    costo_bordado = fields.Decimal(
+        as_string=True, places=2, load_default=0, validate=validate.Range(min=0)
+    )
+    costos_indirectos = fields.Decimal(
+        as_string=True, places=2, load_default=0, validate=validate.Range(min=0)
+    )
+    precio_venta = fields.Decimal(
+        as_string=True, places=2, allow_none=True, validate=validate.Range(min=0)
+    )
     lineas = fields.List(fields.Nested(RecetaLineaCrearSchema), load_default=list)
 
 

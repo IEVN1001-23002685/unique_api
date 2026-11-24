@@ -21,6 +21,10 @@ def registrar_manejadores_de_error(app: Flask) -> None:
     def _error_de_api(error):
         return error.respuesta()
 
+    @app.errorhandler(413)
+    def _archivo_demasiado_grande(_error):
+        return ApiError("ARCHIVO_GRANDE", "El archivo enviado excede el tamaño permitido", 400).respuesta()
+
     @app.errorhandler(404)
     def _no_encontrado(_error):
         return ApiError("NO_ENCONTRADO", "Recurso no encontrado", 404).respuesta()

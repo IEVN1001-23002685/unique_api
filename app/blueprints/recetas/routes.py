@@ -23,6 +23,7 @@ from app.schemas.receta import (
 from app.security import roles_requeridos, usuario_actual
 from app.services import diseno_service, receta_service
 from app.utils.errores import ApiError
+from app.utils.paginacion import paginar_lista, parametros_paginacion
 from app.utils.validacion import cuerpo
 
 recetas_bp = Blueprint("recetas", __name__, url_prefix="/api/v1")
@@ -45,23 +46,24 @@ def _es_admin() -> bool:
 
 
 @recetas_bp.get("/recetas")
-@roles_requeridos("O")
+@roles_requeridos("OPERATIVO")
 def listar_recetas():
     filtros = _parametros(RecetaFiltrosSchema())
     admin = _es_admin()
     recetas = receta_service.listar(filtros, incluir_costos=admin)
     esquema = RecetaListaSchema(many=True) if admin else RecetaOperativoSchema(many=True)
-    return jsonify(esquema.dump(recetas))
+    pagina, por_pagina = parametros_paginacion()
+    return jsonify(paginar_lista(esquema.dump(recetas), pagina, por_pagina))
 
 
 @recetas_bp.get("/recetas/costeo")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def costeo():
     return jsonify(CosteoFilaSchema(many=True).dump(receta_service.costeo()))
 
 
 @recetas_bp.post("/recetas/previsualizar")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def previsualizar():
     datos = cuerpo(RecetaPrevisualizarSchema())
     return jsonify(
@@ -70,7 +72,7 @@ def previsualizar():
 
 
 @recetas_bp.post("/recetas")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def crear_receta():
     datos = cuerpo(RecetaCrearSchema())
     receta = receta_service.crear(datos, usuario_actual().id)
@@ -78,7 +80,7 @@ def crear_receta():
 
 
 @recetas_bp.get("/recetas/<int:receta_id>")
-@roles_requeridos("O")
+@roles_requeridos("OPERATIVO")
 def obtener_receta(receta_id):
     admin = _es_admin()
     receta = receta_service.obtener(receta_id, incluir_costos=admin)
@@ -87,7 +89,7 @@ def obtener_receta(receta_id):
 
 
 @recetas_bp.patch("/recetas/<int:receta_id>")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def actualizar_receta(receta_id):
     datos = cuerpo(RecetaActualizarSchema(), parcial=True)
     if not datos:
@@ -97,7 +99,7 @@ def actualizar_receta(receta_id):
 
 
 @recetas_bp.post("/recetas/<int:receta_id>/lineas")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def agregar_linea(receta_id):
     datos = cuerpo(RecetaLineaCrearSchema())
     receta = receta_service.agregar_linea(receta_id, datos, usuario_actual().id)
@@ -105,7 +107,7 @@ def agregar_linea(receta_id):
 
 
 @recetas_bp.post("/recetas/<int:receta_id>/copiar")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def copiar_receta(receta_id):
     datos = cuerpo(RecetaCopiarSchema(), parcial=True)
     receta = receta_service.copiar(receta_id, datos, usuario_actual().id)
@@ -113,7 +115,7 @@ def copiar_receta(receta_id):
 
 
 @recetas_bp.post("/recetas/<int:receta_id>/activar")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def activar_receta(receta_id):
     receta = receta_service.activar(
         receta_id, usuario_actual().id, ip=request.remote_addr
@@ -122,14 +124,16 @@ def activar_receta(receta_id):
 
 
 @recetas_bp.get("/disenos")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def listar_disenos():
     filtros = _parametros(DisenoFiltrosSchema())
-    return jsonify(DisenoSchema(many=True).dump(diseno_service.listar(filtros)))
+    pagina, por_pagina = parametros_paginacion()
+    items = DisenoSchema(many=True).dump(diseno_service.listar(filtros))
+    return jsonify(paginar_lista(items, pagina, por_pagina))
 
 
 @recetas_bp.post("/disenos")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def crear_diseno():
     datos = cuerpo(DisenoCrearSchema())
     diseno = diseno_service.crear(datos, usuario_actual().id, ip=request.remote_addr)
@@ -137,13 +141,13 @@ def crear_diseno():
 
 
 @recetas_bp.get("/disenos/<int:diseno_id>")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def obtener_diseno(diseno_id):
     return jsonify(DisenoSchema().dump(diseno_service.obtener(diseno_id)))
 
 
 @recetas_bp.patch("/disenos/<int:diseno_id>")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def actualizar_diseno(diseno_id):
     datos = cuerpo(DisenoActualizarSchema(), parcial=True)
     if not datos:
@@ -155,7 +159,7 @@ def actualizar_diseno(diseno_id):
 
 
 @recetas_bp.delete("/disenos/<int:diseno_id>")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def desactivar_diseno(diseno_id):
     diseno_service.desactivar(diseno_id, usuario_actual().id, ip=request.remote_addr)
     return "", 204

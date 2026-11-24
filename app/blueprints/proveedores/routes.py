@@ -16,7 +16,7 @@ from app.schemas.proveedor import (
 from app.security import roles_requeridos, usuario_actual
 from app.services import proveedor_service
 from app.utils.errores import ApiError
-from app.utils.paginacion import parametros_paginacion
+from app.utils.paginacion import paginar_lista, parametros_paginacion
 from app.utils.validacion import cuerpo
 
 proveedores_bp = Blueprint("proveedores", __name__, url_prefix="/api/v1")
@@ -92,8 +92,10 @@ def desactivar_proveedor(proveedor_id):
 @proveedores_bp.get("/proveedores/<int:proveedor_id>/materiales")
 @roles_requeridos("ADMIN")
 def listar_materiales_proveedor(proveedor_id):
+    pagina, por_pagina = parametros_paginacion()
     materiales = proveedor_service.listar_materiales(proveedor_id)
-    return jsonify(ProveedorMaterialSchema(many=True).dump(materiales))
+    items = ProveedorMaterialSchema(many=True).dump(materiales)
+    return jsonify(paginar_lista(items, pagina, por_pagina))
 
 
 @proveedores_bp.post("/proveedores/<int:proveedor_id>/materiales")

@@ -34,6 +34,25 @@ confirmación del equipo.
 | Identificador de idempotencia | El resultado se guarda en `idempotencia_operacion` con `alcance = checkout:pagar`. La petición se identifica por hash del JSON canónico; la misma clave con otro cuerpo devuelve `409 IDEMPOTENCIA_CONFLICTO`. Un replay de una operación `COMPLETADA` devuelve la respuesta original; un replay `ERROR` devuelve el error original sin repetir efectos. Estos campos provienen de `AGENTS.md`, no del documento funcional. | Decidido según `AGENTS.md` |
 | Cancelación de pedido | El `CHECK` de `pedido_linea` exige `cant_reservada + cant_pendiente = cantidad`. Al cancelar se ponen en cero las tres cantidades; la venta conserva la cantidad original en su histórico. | Implementado; efecto documentado |
 
+## Fase 3 (M10–M15)
+
+| Tema | Decisión | Estado |
+|---|---|---|
+| Formato de SKU | El documento ejemplifica `PL-MD-GR` y `GO-UN-NG`. El consecutivo por categoría se construye sobre el prefijo (`GO2-UN-GR`) para evitar duplicados cuando hay varias colecciones de la misma categoría. Sigue siendo de tres segmentos, se genera en servidor bloqueando la fila de categoría y no cambia al renombrar el producto. | Decidido; confirmar prefijo numérico con el equipo |
+| Borradores de receta al crear producto | `POST /productos` crea una receta `BORRADOR` por talla. Un `POST /recetas` posterior para la misma talla reutiliza ese borrador y responde `201` en lugar de `409 BORRADOR_EXISTENTE`. Así se conserva el flujo M10→M11 sin recetas duplicadas. | Implementado |
+| Activación de producto | La matriz de roles del documento (línea 473) permite lectura M10 a `OPERATIVO`, pero la sección 11 de `AGENTS.md` exige solo `ADMIN`. Prevalece `ADMIN` para `/productos` y se mantiene `OPERATIVO` para lectura de `/recetas`, donde el documento sí lo autoriza. | Decidido según `AGENTS.md`; pendiente de confirmar |
+| Código de ajuste de inventario PT | La acción modifica existencias, por lo que responde `200` y no `201`, según el contrato general (sección 10). | Decidido |
+| Listados en memoria | `/productos`, `/recetas`, `/disenos`, `/proveedores/{id}/materiales` y `/cotizaciones` se paginan en la capa HTTP con `{items,total,pagina,por_pagina}`. No se añadió `LIMIT/OFFSET` en servicio porque estos catálogos son pequeños; se revisará si crecen. | Implementado |
+| Evaluación de proveedores | `GET /proveedores/evaluacion` es de solo lectura y devuelve el estatus derivado. La mutación de estatus y la alerta `PROVEEDOR_EN_REVISION` se dejan para la tarea diaria `evaluar_proveedores` (Fase 6). El porcentaje divide entre órdenes **recibidas**, no entre órdenes con `fecha_prometida`; sin historial se reporta `100.00` para no penalizar sin evidencia. | Decidido; tarea pendiente |
+| Cotizaciones | El proveedor debe tener el material en su catálogo activo para cotizar. Elegir una cotización con `vigencia_hasta` vencida responde `409`. El mínimo de dos cotizaciones cuando hay alterno y el plazo de entrega por proveedor quedan pendientes: el documento no fija regla operativa completa. | Parcial; pendiente de confirmar |
+| Recepción y reservas de producción | La recepción cierra `OC_RETRASADA`, crea lotes por lo aceptado y genera merma por el rechazo. La reevaluación de órdenes `PLANEADA` y de alertas `MP_REORDEN` requiere M16 y se implementará en Fase 4. | Pendiente (Fase 4) |
+| Cierre de OC con faltante | El documento permite cerrar con faltante con confirmación de `ADMIN`, pero no define el estado final ni el efecto en la requisición. No se implementa una regla inventada. | Pendiente de confirmar |
+| Inmutabilidad de movimientos | Las rutas solo insertan movimientos y las correcciones usan movimientos inversos. No hay `UPDATE`/`DELETE` expuestos, pero la restricción aún no existe en la base; se añadirá con trigger o `GRANT` en una migración. | Parcial |
+| Tipo de movimiento en ajuste MP | `consumir_peps` acepta el tipo de movimiento. Los ajustes negativos escriben `AJUSTE` para no contaminar el consumo de 30 días que alimenta el punto de reorden. | Corregido |
+| Dueño de la merma | M13/M15 registran mermas de recepción y ajuste con `CausaMerma`, pero la creación centralizará en el servicio de M17 cuando ese módulo se implemente en Fase 4. | Pendiente (Fase 4) |
+| Alcance de idempotencia en recepciones | `recepciones:registrar`, separado de `checkout:pagar`. Un error persistido con la misma clave no sobrescribe una respuesta `COMPLETADA`. | Implementado |
+| Imágenes | Se valida contenido real, MIME declarado y tamaño máximo de 2 MB antes de confirmar. Si falla la transacción después de escribir el archivo, se elimina el archivo huérfano. | Implementado |
+
 ## Convención de nombres
 
 Los mensajes de error usan texto en español sin acentos en los códigos (`METODO_NO_PERMITIDO`),

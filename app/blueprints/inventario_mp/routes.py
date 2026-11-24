@@ -32,7 +32,14 @@ def _con_costos():
 
 
 def _filtros(schema):
-    filtros = schema.load(request.args)
+    try:
+        filtros = schema.load(request.args)
+    except ValidationError as error:
+        detalle = [
+            {"campo": campo, "mensaje": str(mensaje)}
+            for campo, mensaje in error.messages.items()
+        ]
+        raise ApiError("VALIDACION", "Parámetros inválidos", 400, detalle)
     pagina, por_pagina = parametros_paginacion()
     filtros.update(pagina=pagina, por_pagina=por_pagina)
     return filtros

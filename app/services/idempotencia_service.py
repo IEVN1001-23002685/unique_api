@@ -2,6 +2,8 @@
 
 import hashlib
 import json
+from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy.exc import IntegrityError
 
@@ -10,9 +12,19 @@ from app.models import IdempotenciaOperacion
 from app.utils.errores import ApiError
 
 
+def _valor_serializable(valor):
+    if isinstance(valor, (Decimal, date, datetime)):
+        return str(valor)
+    raise TypeError(f"Tipo no serializable en la petición: {type(valor).__name__}")
+
+
 def hash_peticion(payload: dict) -> str:
     canonico = json.dumps(
-        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        default=_valor_serializable,
     )
     return hashlib.sha256(canonico.encode("utf-8")).hexdigest()
 
@@ -77,6 +89,9 @@ def completar(registro: IdempotenciaOperacion, respuesta: dict) -> None:
 def registrar_error(clave: str, alcance: str, peticion: dict, respuesta: dict) -> None:
     """Guarda una respuesta de error sin participar en la transacción fallida."""
     huella = hash_peticion(peticion)
+    previo = db.session.get(IdempotenciaOperacion, clave)
+    if previo is not None and previo.estado == "COMPLETADA":
+        return
     registro = IdempotenciaOperacion(
         clave=clave,
         alcance=alcance,

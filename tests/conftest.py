@@ -1,5 +1,6 @@
 import os
 import secrets
+from decimal import Decimal
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -380,16 +381,21 @@ def tienda(app, mysql_disponible):
 
 @pytest.fixture
 def limpieza_fase3(app, mysql_disponible):
-    """Registra limpieza SQL en orden inverso para datos aislados de Fase 3."""
+    """Limpia datos de Fase 3 en orden de registro: hijos antes que padres."""
     tareas = []
+    finales = []
 
     def registrar(sql, parametros=None):
         tareas.append((sql, parametros or {}))
 
+    def registrar_al_final(sql, parametros=None):
+        finales.append((sql, parametros or {}))
+
+    registrar.al_final = registrar_al_final
     yield registrar
 
     with app.app_context():
-        for sql, parametros in reversed(tareas):
+        for sql, parametros in (*tareas, *finales):
             db.session.execute(text(sql), parametros)
         db.session.commit()
 
@@ -404,6 +410,7 @@ def datos_fase3(app, limpieza_fase3):
         InventarioMaterial,
         Material,
         Proveedor,
+        ProveedorMaterial,
         Talla,
     )
 
@@ -439,9 +446,22 @@ def datos_fase3(app, limpieza_fase3):
                 condiciones_pago="Contado",
             )
             db.session.add(proveedor)
-            db.session.commit()
+            db.session.flush()
             proveedor_id = proveedor.id
-        limpieza_fase3("DELETE FROM proveedor WHERE id = :id", {"id": proveedor_id})
+            db.session.add(
+                ProveedorMaterial(
+                    proveedor_id=proveedor.id,
+                    material_id=material.id,
+                    precio_compra=Decimal("5000.00"),
+                    minimo_compra=Decimal("1.00"),
+                    plazo_dias=7,
+                    es_principal=True,
+                    activo=True,
+                )
+            )
+            db.session.commit()
+        limpieza_fase3("DELETE FROM proveedor_material WHERE proveedor_id = :id", {"id": proveedor_id})
+        limpieza_fase3.al_final("DELETE FROM proveedor WHERE id = :id", {"id": proveedor_id})
         return proveedor_id
 
     return {

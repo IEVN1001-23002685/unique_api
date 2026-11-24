@@ -65,9 +65,10 @@ docker compose exec api python -m pytest -q
 Si la API no conecta con MySQL: `docker compose exec api python scripts/diagnose_db.py`.
 Cualquier cambio en código requiere `docker compose build` antes de `up -d`.
 
-`flask db upgrade` aplica las revisiones de Fase 1 (modelo completo, vistas e índices). La
-Fase 2 no añadió tablas funcionales: reutiliza el modelo y la tabla de infraestructura
-`idempotencia_operacion`. Después ejecute las semillas, que son idempotentes:
+`flask db upgrade` aplica las revisiones de Fase 1 (modelo completo, vistas e índices). Las
+Fases 2 y 3 no añadieron tablas funcionales: reutilizan el modelo y la tabla de infraestructura
+`idempotencia_operacion` (alcances `checkout:pagar` y `recepciones:registrar`). Después ejecute
+las semillas, que son idempotentes:
 
 ```bash
 docker compose exec api python -m scripts.seed
@@ -83,6 +84,13 @@ docker compose exec api python -m scripts.create_admin operativo
 ```
 
 No hay contraseñas fijas en el código ni en las semillas.
+
+La Fase 3 está cubierta por `tests/integration/test_fase3_productos.py`,
+`test_fase3_materiales.py` y `test_fase3_compras.py`: SKU y folios, activación de productos y
+recetas, receta `VIGENTE` no editable, ajustes con movimientos inmutables, PEPS, recepciones
+idempotentes con merma por rechazo, permisos Admin/Operativo y ocultamiento de costos. La suite
+completa es `54 passed`. Las imágenes se guardan en el volumen de uploads, se validan con Pillow
+y se rechazan si superan 2 MB.
 
 ## Detener y reiniciar
 

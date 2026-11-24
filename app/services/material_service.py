@@ -3,7 +3,7 @@
 Las operaciones ``registrar_entrada``, ``registrar_rechazo_recepcion`` y
 ``consumir_peps`` solo hacen ``flush``: el módulo que las invoca (M14 o M16)
 debe confirmar la transacción completa. ``generar_requisicion_automatica``
-también deja la escribencia pendiente de confirmación para el llamador.
+también deja la escritura pendiente de confirmación para el llamador.
 """
 
 from datetime import date, datetime, time, timedelta
@@ -170,28 +170,21 @@ def _metricas(inventario_material_id: int) -> dict:
             )
         ),
     )
+    compra_pendiente, aceptada = db.session.execute(
+        select(
+            func.coalesce(func.sum(OrdenCompraLinea.cantidad_compra), 0),
+            func.coalesce(func.sum(OrdenCompraLinea.cantidad_base_aceptada), 0),
+        )
+        .join(OrdenCompra, OrdenCompra.id == OrdenCompraLinea.orden_compra_id)
+        .where(
+            OrdenCompraLinea.inventario_material_id == inventario_material_id,
+            OrdenCompra.estado.in_(ESTADOS_OC_PENDIENTES),
+        )
+    ).one()
     en_compra = max(
         Decimal("0"),
-        _d(
-            db.session.scalar(
-                select(
-                    func.coalesce(
-                        func.sum(
-                            OrdenCompraLinea.cantidad_compra
-                            - OrdenCompraLinea.cantidad_base_aceptada
-                        ),
-                        0,
-                    )
-                )
-                .join(
-                    OrdenCompra, OrdenCompra.id == OrdenCompraLinea.orden_compra_id
-                )
-                .where(
-                    OrdenCompraLinea.inventario_material_id == inventario_material_id,
-                    OrdenCompra.estado.in_(ESTADOS_OC_PENDIENTES),
-                )
-            )
-        ),
+        _d(compra_pendiente) * _d(inventario.material.factor_compra_base)
+        - _d(aceptada),
     )
     consumo_30d = _d(
         db.session.scalar(
@@ -818,7 +811,13 @@ def registrar_rechazo_recepcion(
 
 
 def consumir_peps(
-    inventario_id, cantidad, documento_tipo, documento_id, usuario_id, motivo=None
+    inventario_id,
+    cantidad,
+    documento_tipo,
+    documento_id,
+    usuario_id,
+    motivo=None,
+    tipo="CONSUMO",
 ) -> list:
     """Consume lotes por PEPS con FOR UPDATE; sin escribir si no hay suficiente."""
     requerida = _d(cantidad)
@@ -861,7 +860,7 @@ def consumir_peps(
         db.session.add(
             MovimientoMaterial(
                 lote_id=lote.id,
-                tipo="CONSUMO",
+                tipo=tipo,
                 cantidad_base=-tomado,
                 costo_unitario_base=lote.costo_unitario_base,
                 documento_tipo=documento_tipo,
@@ -886,10 +885,30 @@ def consumir_peps(
     return consumo
 
 
+def _alerta_reorden(inventario_id, titulo, detalle):
+    alerta = alertas_service.abrir(
+        "MP_REORDEN",
+        "PREVENTIVA",
+        titulo,
+        detalle,
+        "inventario_material",
+        inventario_id,
+        rol_destino="ADMIN",
+        clave_unica=f"MP_REORDEN:{inventario_id}",
+        accion_sugerida="Emitir solicitud de compra",
+    )
+    if alerta is not None and alerta.estado != "ABIERTA":
+        alerta.estado = "ABIERTA"
+        alerta.atendida_por = None
+        alerta.atendida_en = None
+
+
 def generar_requisicion_automatica(inventario_id, usuario_id):
     """Genera una requisición ALERTA deduplicada al llegar al punto de reorden.
 
-    No confirma la transacción: M14 o la tarea programada debe hacerlo.
+    El modelo no tiene una columna de clave de negocio, por eso se usa
+    ``Requisicion.notas`` con el prefijo ``AUTO_REORDEN:``. No confirma la
+    transacción: M14 o la tarea programada debe hacerlo.
     """
     inventario = db.session.get(InventarioMaterial, inventario_id)
     if inventario is None or not inventario.activo:
@@ -913,16 +932,10 @@ def generar_requisicion_automatica(inventario_id, usuario_id):
 
     principal, _plazo = _proveedor_principal(inventario.material_id)
     if principal is None:
-        alertas_service.abrir(
-            "MP_REORDEN",
-            "PREVENTIVA",
+        _alerta_reorden(
+            inventario_id,
             "Material en punto de reorden sin proveedor principal",
             f"El inventario {inventario_id} requiere un proveedor principal.",
-            "inventario_material",
-            inventario_id,
-            rol_destino="ADMIN",
-            clave_unica=f"MP_REORDEN:{inventario_id}",
-            accion_sugerida="Asignar proveedor principal",
         )
         return None
 
@@ -957,16 +970,10 @@ def generar_requisicion_automatica(inventario_id, usuario_id):
             cantidad_compra_atendida=0,
         )
     )
-    alertas_service.abrir(
-        "MP_REORDEN",
-        "PREVENTIVA",
+    _alerta_reorden(
+        inventario_id,
         "Material en punto de reorden",
         f"El inventario {inventario_id} alcanzó su punto de reorden.",
-        "inventario_material",
-        inventario_id,
-        rol_destino="ADMIN",
-        clave_unica=f"MP_REORDEN:{inventario_id}",
-        accion_sugerida="Emitir solicitud de compra",
     )
     db.session.flush()
     return requisicion
@@ -1001,8 +1008,9 @@ def ajustar(datos, usuario_id):
             inventario.id,
             usuario_id,
             motivo=f"Ajuste por conteo: {motivo}",
+            tipo="AJUSTE",
         )
-        destino = "CONSUMO"
+        destino = "AJUSTE"
         if datos.get("mandar_a_merma"):
             causa = None
             if datos.get("causa_merma_id"):

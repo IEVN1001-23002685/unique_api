@@ -304,7 +304,7 @@ def ajuste(datos: dict, usuario_id: int) -> dict:
             f"SKU {variante.sku}: existencia {anterior}, contada {contada}, diferencia {diferencia}. {motivo}",
             "variante_producto",
             variante_id,
-            clave_unica=f"DIFERENCIA_CONTEO:{variante_id}:{datetime.now(timezone.utc).timestamp():.0f}",
+            clave_unica=f"DIFERENCIA_CONTEO:{variante_id}",
             accion_sugerida="Verificar movimientos de producto terminado",
         )
         alertas_service.evaluar_variantes([variante_id])
@@ -344,7 +344,7 @@ def actualizar_reglas(variante_id: int, datos: dict, usuario_id: int, ip=None) -
         stock = stock_service.bloquear([variante_id])[variante_id]
         cambios = {}
         for campo in ("stock_minimo", "cantidad_reposicion"):
-            if campo in datos:
+            if campo in datos and datos[campo] is not None:
                 valor = int(datos[campo])
                 if valor < 0:
                     raise ApiError("VALOR_NEGATIVO", f"{campo} no puede ser negativo", 400)

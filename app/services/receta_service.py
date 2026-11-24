@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy import case, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from app.extensions import db
@@ -146,7 +147,7 @@ def _costo_empaque() -> Decimal:
     reglas = db.session.execute(
         select(EmpaqueRegla, Material)
         .join(Material, Material.id == EmpaqueRegla.material_id)
-        .where(EmpaqueRegla.base == "POR_PRENDA", EmpaqueRegla.activo.is_(True))
+        .where(EmpaqueRegla.base == "POR_PRENDA", EmpaqueRegla.activa.is_(True))
     ).all()
     return sum(
         (_d(regla.cantidad) * _d(material.costo_estandar_base)) for regla, material in reglas
@@ -325,7 +326,7 @@ def listar(filtros=None, incluir_costos: bool = True) -> list:
     recetas = db.session.execute(
         consulta.order_by(Producto.nombre, Receta.talla_id, Receta.version.desc())
     ).scalars().all()
-    return [_detalle(receta, incluir_costos) for receta in recetas]
+    return [_detalle(receta, incluir_costos, detalle=True) for receta in recetas]
 
 
 def obtener(receta_id: int, incluir_costos: bool = True) -> dict:
@@ -334,18 +335,35 @@ def obtener(receta_id: int, incluir_costos: bool = True) -> dict:
 
 def crear(datos: dict, usuario_id: int) -> dict:
     try:
-        receta = crear_borrador(datos["producto_id"], datos["talla_id"], usuario_id)
+        borrador = db.session.scalar(
+            select(Receta).where(
+                Receta.producto_id == datos["producto_id"],
+                Receta.talla_id == datos["talla_id"],
+                Receta.estado == "BORRADOR",
+            )
+        )
+        es_nuevo = borrador is None
+        receta = (
+            crear_borrador(datos["producto_id"], datos["talla_id"], usuario_id)
+            if es_nuevo
+            else borrador
+        )
         for campo in ("mano_obra", "costo_bordado", "costos_indirectos", "nota"):
             if campo in datos:
                 setattr(receta, campo, datos[campo])
         registrar_bitacora(
             usuario_id,
-            "RECETA_CREADA",
+            "RECETA_CREADA" if es_nuevo else "RECETA_BORRADOR_ACTUALIZADO",
             "receta",
             receta.id,
             {"producto_id": receta.producto_id, "talla_id": receta.talla_id},
         )
         db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ApiError(
+            "RECETA_DUPLICADA", "Ya existe una versión de receta para esa talla", 409
+        )
     except Exception:
         db.session.rollback()
         raise
@@ -439,9 +457,6 @@ def agregar_linea(receta_id: int, datos: dict, usuario_id: int) -> dict:
 
 def _lineas_calculadas(lineas) -> list:
     resultado = []
-    color_na = db.session.execute(
-        select(Color.id).where(Color.codigo == "NA")
-    ).scalars().first()
     for linea in lineas or []:
         if linea.get("diseno_id") is not None:
             diseno = db.session.get(DisenoBordado, linea["diseno_id"])
@@ -479,6 +494,12 @@ def _lineas_calculadas(lineas) -> list:
         )
         neta = _d(linea.get("cantidad_neta") or 0)
         factor = _d(linea.get("factor_consumo") or 1)
+        if neta <= 0 or factor <= 0 or not 0 <= _d(merma) < 100:
+            raise ApiError(
+                "LINEA_RECETA_INVALIDA",
+                "La cantidad y el factor deben ser positivos y la merma menor a 100",
+                422,
+            )
         bruta = cantidad_bruta(neta, factor, merma)
         resultado.append(
             {

@@ -45,8 +45,8 @@ class AjusteSchema(Schema):
 
 
 class ReglasActualizarSchema(Schema):
-    stock_minimo = fields.Int(required=True, validate=validate.Range(min=0))
-    cantidad_reposicion = fields.Int(required=True, validate=validate.Range(min=0))
+    stock_minimo = fields.Int(allow_none=True, validate=validate.Range(min=0))
+    cantidad_reposicion = fields.Int(allow_none=True, validate=validate.Range(min=0))
 
 
 class InventarioItemSchema(Schema):

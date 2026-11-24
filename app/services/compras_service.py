@@ -393,6 +393,31 @@ def crear_cotizacion(requisicion_id: int, datos: dict, usuario_id: int) -> dict:
     }
     if not datos.get("lineas"):
         raise ApiError("LINEAS_REQUERIDAS", "La cotización requiere líneas", 422)
+    materiales = set(
+        db.session.scalars(
+            select(InventarioMaterial.material_id).where(
+                InventarioMaterial.id.in_(
+                    [linea.inventario_material_id for linea in lineas_req.values()]
+                )
+            )
+        ).all()
+    )
+    surtidos = set(
+        db.session.scalars(
+            select(ProveedorMaterial.material_id).where(
+                ProveedorMaterial.proveedor_id == proveedor.id,
+                ProveedorMaterial.activo.is_(True),
+                ProveedorMaterial.material_id.in_(materiales),
+            )
+        ).all()
+    )
+    if materiales - surtidos:
+        raise ApiError(
+            "PROVEEDOR_NO_SURTE_MATERIAL",
+            "El proveedor no tiene en su catálogo todos los materiales solicitados",
+            422,
+            sorted(materiales - surtidos),
+        )
     cotizacion = Cotizacion(
         requisicion_id=requisicion.id,
         proveedor_id=proveedor.id,
@@ -447,6 +472,8 @@ def elegir_cotizacion(cotizacion_id: int, usuario_id: int, ip=None) -> dict:
         raise ApiError("COTIZACION_NO_ENCONTRADA", "Cotización no encontrada", 404)
     if cotizacion.estado != "PENDIENTE":
         raise ApiError("ESTADO_INVALIDO", "La cotización ya fue resuelta", 409)
+    if cotizacion.vigencia_hasta is not None and cotizacion.vigencia_hasta < date.today():
+        raise ApiError("COTIZACION_VENCIDA", "La cotización ya no es vigente", 409)
     requisicion = cotizacion.requisicion
     if requisicion.estado in ("CANCELADA", "ATENDIDA", "COMPRA_EMITIDA"):
         raise ApiError("ESTADO_INVALIDO", "La requisición no permite emitir orden", 409)
@@ -849,9 +876,13 @@ def registrar_recepcion(datos: dict, usuario_id: int, clave: str) -> dict:
     if not clave:
         raise ApiError("IDEMPOTENCIA_REQUERIDA", "Se requiere Idempotency-Key", 400)
     peticion = {"usuario_id": usuario_id, **datos}
-    registro, respuesta_previa = idempotencia_service.iniciar(
-        clave, ALCANCE_IDEMPOTENCIA, peticion
-    )
+    try:
+        registro, respuesta_previa = idempotencia_service.iniciar(
+            clave, ALCANCE_IDEMPOTENCIA, peticion
+        )
+    except ApiError:
+        db.session.rollback()
+        raise
     if respuesta_previa is not None:
         return respuesta_previa
     try:

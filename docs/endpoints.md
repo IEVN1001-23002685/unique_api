@@ -147,6 +147,155 @@ con ambas cantidades en cero. El histórico de la venta conserva la cantidad ori
 Cualquier pedido ajeno responde `404`, nunca `403`, para no revelar existencia de recursos de
 otros clientes.
 
+## M10 — Productos, variantes, imágenes y activación
+
+| Método | Ruta | Rol | Parámetros / cuerpo | Respuesta |
+|---|---|---|---|---|
+| `GET` | `/productos` | A | `q`, `categoria`, `color`, `talla`, `activo`, `pagina`, `por_pagina` | Lista paginada (`200`) |
+| `POST` | `/productos` | A | `categoria_id`, `nombre`, `descripcion`, `composicion_textil`, `guia_medidas`, `precio_venta`, `tallas`, `colores`, `stock_minimo`, `cantidad_reposicion`, `permite_bajo_pedido` | Producto con variantes y recetas borrador (`201`) |
+| `GET` | `/productos/{id}` | A | — | Detalle con variantes, imágenes y recetas (`200`) |
+| `PATCH` | `/productos/{id}` | A | Campos editables; `tallas`/`colores` opcionales | Producto actualizado (`200`) |
+| `DELETE` | `/productos/{id}` | A | — | `204`; borrado lógico o físico solo sin historial |
+| `POST` | `/productos/{id}/imagenes` | A | `multipart/form-data`: `archivo`, `color`, `orden` | Imagen guardada (`201`) |
+| `PATCH` | `/variantes/{id}` | A | `activa` | Variante (`200`) |
+| `POST` | `/productos/{id}/activar` | A | — | Producto activo (`200`) |
+
+El SKU se genera en servidor con tres segmentos (`categoria-talla-color`) y no se modifica al
+renombrar el producto. `POST /productos` crea una receta `BORRADOR` por cada talla solicitada.
+`activar` exige al menos una imagen y una receta `VIGENTE` **por cada talla del producto**, no
+por todas las tallas de la categoría. Las imágenes admiten JPG, PNG y WebP de hasta 2 MB; se
+verifica el contenido real con Pillow, el MIME declarado debe coincidir y el archivo se guarda
+fuera del código con nombre aleatorio. Un error posterior al guardado elimina el archivo.
+
+Errores: `400 ARCHIVO_GRANDE`, `401`, `403`, `404 CATEGORIA_NO_DISPONIBLE`,
+`409 PRODUCTO_YA_ACTIVO`, `409 SKU_DUPLICADO`, `422 IMAGEN_REQUERIDA`,
+`422 IMAGEN_NO_VALIDA`, `422 RECETA_NO_VIGENTE`, `422 PRODUCTO_CON_HISTORIAL`.
+
+## M11 — Recetas, costeo y diseños
+
+| Método | Ruta | Rol | Parámetros / cuerpo | Respuesta |
+|---|---|---|---|---|
+| `GET` | `/recetas` | A, O | `producto_id`, `talla_id`, `estado`, `q`, `pagina`, `por_pagina` | Lista paginada (`200`) |
+| `POST` | `/recetas` | A | `producto_id`, `talla_id`, `mano_obra`, `costo_bordado`, `costos_indirectos`, `nota` | Receta borrador (`201`) |
+| `GET` | `/recetas/{id}` | A, O | — | Receta (`200`) |
+| `PATCH` | `/recetas/{id}` | A | Campos económicos y `nota` | Receta (`200`) |
+| `POST` | `/recetas/{id}/lineas` | A | `material_id` o `diseno_id`, `cantidad_neta`, `factor_consumo`, `merma_pct`, `aplicaciones`, `ubicacion` | Línea (`201`) |
+| `POST` | `/recetas/previsualizar` | A | Producto, talla y líneas propuestas | Costeo prospectivo (`200`) |
+| `POST` | `/recetas/{id}/copiar` | A | `producto_id`, `talla_id`, `nota` | Nuevo borrador (`201`) |
+| `POST` | `/recetas/{id}/activar` | A | — | Receta `VIGENTE`; la anterior pasa a `ARCHIVADA` (`200`) |
+| `GET` | `/recetas/costeo` | A | Filtros de producto/talla/estado | Costeo paginado (`200`) |
+| `GET` | `/disenos` | A | `activo`, `estado`, `pagina`, `por_pagina` | Lista paginada (`200`) |
+| `POST` | `/disenos` | A | Datos del diseño | Diseño (`201`) |
+| `GET` | `/disenos/{id}` | A | — | Diseño (`200`) |
+| `PATCH` | `/disenos/{id}` | A | Campos editables | Diseño (`200`) |
+| `DELETE` | `/disenos/{id}` | A | — | Borrado lógico (`204`) |
+
+`POST /productos` ya crea el borrador de cada talla: si se repite `POST /recetas` para esa
+misma talla, se reutiliza el borrador existente y se devuelve `201`. Una receta `VIGENTE` o
+`ARCHIVADA` no se edita (`422 RECETA_NO_EDITABLE`); debe copiarse. `copiar` incrementa la
+versión y `activar` archiva la vigente anterior en la misma transacción. La cantidad bruta
+sigue `cantidad_neta * factor_consumo / (1 - merma_pct/100)`; `merma_pct` debe estar entre 0 y
+100, y cantidad y factor deben ser positivos.
+
+`ADMIN` recibe `mano_obra`, `costo_bordado`, `costos_indirectos`, `costo_materia_prima`,
+`costo_estandar`, `precio_sugerido`, `margen_real` y `costo_linea`. `OPERATIVO` recibe las
+mismas operaciones de lectura sin ninguno de esos campos. Las recetas semilla permanecen en
+`BORRADOR`; la de Playera CH tiene una nota de patrón pendiente y no debe activarse sin revisión.
+
+Errores: `409 RECETA_YA_VIGENTE`, `422 RECETA_SIN_TELA`, `422 RECETA_NO_ACTIVABLE`,
+`422 RECETA_DUPLICADA`, `422 LINEA_RECETA_INVALIDA`, `422 DISENO_NO_DISPONIBLE`.
+
+## M12 — Inventario de producto terminado
+
+| Método | Ruta | Rol | Parámetros / cuerpo | Respuesta |
+|---|---|---|---|---|
+| `GET` | `/inventario/producto` | O | `categoria`, `sku`, `color`, `talla`, `semaforo`, `pagina`, `por_pagina` | Lista paginada con semáforo (`200`) |
+| `GET` | `/inventario/producto/movimientos` | O | `sku`, `tipo`, `documento_tipo`, `desde`, `hasta`, `pagina`, `por_pagina` | Kardex paginado (`200`) |
+| `POST` | `/inventario/producto/ajuste` | O | `variante_id`, `cantidad_contada`, `diferencia`, `motivo` | Ajuste y orden de reposición (`200`) |
+| `PATCH` | `/inventario/producto/{variante_id}/reglas` | A | `stock_minimo` y/o `cantidad_reposicion` | Reglas (`200`) |
+
+El ajuste bloquea la variante y el stock, exige `diferencia = contada - existencia` cuando se
+envía, prohíbe dejar `cantidad_contada < reservado` y escribe un movimiento `AJUSTE`. Los
+movimientos son de solo inserción: no existen rutas `PATCH`/`DELETE` para ellos y una corrección
+se registra con un movimiento inverso y motivo. El ajuste a la baja por debajo del mínimo abre
+la alerta `PT_STOCK_MINIMO` y crea o incrementa una orden de reposición. `PATCH` de reglas es
+parcial; con cuerpo vacío responde `400`.
+
+## M13 — Proveedores
+
+| Método | Ruta | Rol | Respuesta |
+|---|---|---|---|
+| `GET` | `/proveedores` | A | Lista paginada con `q`, `estatus`, `material_id`, `incluir_inactivos` |
+| `POST` | `/proveedores` | A | Proveedor (`201`) |
+| `GET` | `/proveedores/{id}` | A | Proveedor (`200`) |
+| `PATCH` | `/proveedores/{id}` | A | Proveedor actualizado (`200`) |
+| `DELETE` | `/proveedores/{id}` | A | `204`, desactivación lógica |
+| `GET` | `/proveedores/{id}/materiales` | A | Lista paginada del catálogo surtido |
+| `POST` | `/proveedores/{id}/materiales` | A | Relación material (`201`) |
+| `PATCH` | `/proveedores/{id}/materiales/{material_id}` | A | Relación actualizada (`200`) |
+| `DELETE` | `/proveedores/{id}/materiales/{material_id}` | A | `204` |
+| `GET` | `/proveedores/evaluacion` | A | Evaluación derivada; **no modifica** el padrón |
+
+El porcentaje de entregas a tiempo divide las entregas puntuales entre las órdenes recibidas.
+Sin historial se reporta `100.00` para no penalizar al proveedor sin evidencia. Si se evalúa por
+debajo del umbral, el estatus derivado es `EN_REVISION`. La persistencia del estatus y la alerta
+`PROVEEDOR_EN_REVISION` quedan para la tarea programada `evaluar_proveedores` (Fase 6).
+
+## M14 — Requisiciones, cotizaciones, órdenes y recepciones
+
+| Método | Ruta | Rol | Respuesta |
+|---|---|---|---|
+| `GET` | `/requisiciones` | A, O | Lista paginada |
+| `POST` | `/requisiciones` | A, O | Requisición con folio `REQ-AAAA-NNNNNN` (`201`) |
+| `GET` | `/requisiciones/{id}` | A, O | Requisición (`200`) |
+| `PATCH` | `/requisiciones/{id}` | A, O | Requisición (`200`) |
+| `DELETE` | `/requisiciones/{id}` | A, O | `204`, cancelación |
+| `POST` | `/requisiciones/{id}/cotizaciones` | A | Cotización (`201`) |
+| `GET` | `/cotizaciones` | A | Lista paginada; filtro `requisicion_id` |
+| `POST` | `/cotizaciones/{id}/elegir` | A | Orden de compra borrador (`200`) |
+| `GET` | `/ordenes-compra` | A | Lista paginada |
+| `POST` | `/ordenes-compra` | A | Orden (`201`) |
+| `GET` | `/ordenes-compra/{id}` | A | Orden (`200`) |
+| `PATCH` | `/ordenes-compra/{id}` | A | Orden (`200`) |
+| `DELETE` | `/ordenes-compra/{id}` | A | `204`, cancelación |
+| `POST` | `/ordenes-compra/{id}/emitir` | A | Orden emitida (`200`) |
+| `POST` | `/ordenes-compra/{id}/cancelar` | A | Orden cancelada (`200`) |
+| `GET` | `/ordenes-compra/{id}/pdf` | A | `application/pdf` |
+| `POST` | `/recepciones` | O | Recepción con lotes PEPS (`201`) |
+
+`POST /recepciones` exige `Idempotency-Key` y usa el alcance `recepciones:registrar`. La misma
+clave y cuerpo devuelven la respuesta original; la misma clave con otro cuerpo responde
+`409 IDEMPOTENCIA_CONFLICTO`. Se valida `aceptada + rechazada = cantidad_medida` y
+`aceptada <= pendiente`; el lote se crea solo con lo aceptado, la entrada se valora al costo real
+y lo rechazado se registra como merma. La orden pasa a `PARCIAL` o `RECIBIDA` según el acumulado
+y se cierra la alerta `OC_RETRASADA`. Una cotización exige que el proveedor surta cada material
+en su catálogo activo; elegir una cotización vencida responde `409 COTIZACION_VENCIDA`.
+
+## M15 — Materiales e inventario de materia prima
+
+| Método | Ruta | Rol | Parámetros / cuerpo | Respuesta |
+|---|---|---|---|---|
+| `GET` | `/materiales` | A, O | `categoria`, `codigo`, `q`, `por_color`, `incluir_inactivos`, paginación | Lista paginada |
+| `POST` | `/materiales` | A | Material en unidad base | Material (`201`) |
+| `GET` | `/materiales/{id}` | A, O | — | Material (`200`) |
+| `PATCH` | `/materiales/{id}` | A | Campos editables | Material (`200`) |
+| `DELETE` | `/materiales/{id}` | A | — | `204`, desactivación lógica |
+| `GET` | `/inventario/material` | O | `categoria`, `material_id`, `color`, `semaforo`, paginación | Posiciones paginadas (`200`) |
+| `GET` | `/inventario/material/lotes` | O | `inventario_material_id`, `estado`, paginación | Lotes paginados (`200`) |
+| `GET` | `/inventario/material/movimientos` | O | `inventario_material_id`, `lote_id`, `tipo`, paginación | Kardex paginado (`200`) |
+| `POST` | `/inventario/material/ajuste` | O | Ajuste por conteo, `mandar_a_merma` | Ajuste (`200`) |
+| `PATCH` | `/inventario/material/{id}/politica` | A | Política de reposición | Inventario (`200`) |
+
+`OPERATIVO` **nunca** recibe `costo_estandar_base`, `precio_compra`, `costo_unitario_base`,
+`costo_total` ni márgenes en materiales, lotes, movimientos ni recetas. Los lotes se consumen
+por PEPS (`fecha_entrada`, `id`) con `FOR UPDATE`. Si no hay suficiente existencia, la
+transacción se revierte y responde `409 MATERIAL_INSUFICIENTE` con los faltantes. Un ajuste
+negativo genera movimientos `AJUSTE`, no `CONSUMO`, para no inflar el consumo de los últimos
+30 días.
+
+Errores comunes de Fase 3: `401`, `403`, `404`, `409 ESTADO_INVALIDO`, `409 MATERIAL_INSUFICIENTE`,
+`409 IDEMPOTENCIA_CONFLICTO`, `422 MATERIAL_NO_DISPONIBLE`, `422 PROVEEDOR_NO_SURTE_MATERIAL`.
+
 ## M22 — Administración (parcial)
 
 | Método | Ruta | Rol | Respuesta |
@@ -177,6 +326,14 @@ otros clientes.
 
 ## Pendiente
 
-Los blueprints M07–M21 y el resto de M22 se documentarán aquí a medida que se implementen.
-La tabla completa de rutas requeridas está en la sección 11 del documento integral y en
-`AGENTS.md`.
+Los blueprints M01–M06, M10–M15 y parte de M22 están documentados. Quedan pendientes M07–M09,
+M16–M21 y el resto de M22, además de las tareas programadas y el dashboard. La tabla completa
+de rutas requeridas está en la sección 11 del documento integral y en `AGENTS.md`.
+
+Pendientes concretos de Fase 3, registrados también en `decisiones-tecnicas.md`:
+
+- Reevaluar reservas de órdenes de producción y alertas `MP_REORDEN` al recibir material
+  (depende de M16, Fase 4).
+- Cerrar órdenes de compra con faltante previa confirmación de `ADMIN`.
+- Exigir dos cotizaciones cuando exista proveedor alterno.
+- Restringir `UPDATE`/`DELETE` de tablas de movimientos con trigger o permisos de base de datos.

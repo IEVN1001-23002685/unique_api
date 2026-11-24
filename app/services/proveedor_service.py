@@ -4,7 +4,7 @@ from collections import defaultdict
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
@@ -87,7 +87,7 @@ def listar(filtros=None):
     filtros = filtros or {}
     paginado, pagina, por_pagina = _paginacion(filtros)
     condiciones = [Proveedor.eliminado_en.is_(None)]
-    if not filtros.get("incluir_inactivos"):
+    if not filtros.get("incluir_inactivos") and filtros.get("estatus") != "INACTIVO":
         condiciones.append(Proveedor.estatus != "INACTIVO")
     if filtros.get("estatus"):
         condiciones.append(Proveedor.estatus == filtros["estatus"])
@@ -214,7 +214,7 @@ def desactivar(id: int, usuario_id, ip=None) -> None:
         )
     else:
         db.session.execute(
-            ProveedorMaterial.__table__.delete().where(
+            delete(ProveedorMaterial).where(
                 ProveedorMaterial.proveedor_id == proveedor.id
             )
         )
@@ -440,8 +440,13 @@ def _abrir_o_reabrir(tipo, titulo, detalle, proveedor_id, clave_unica) -> None:
         alerta.atendida_en = None
 
 
-def evaluacion() -> dict:
-    """Evalúa entregas a tiempo y aceptación; ajusta estatus y abre alertas."""
+def evaluacion(persistir: bool = False) -> dict:
+    """Calcula entregas a tiempo y aceptación por proveedor.
+
+    Por defecto es de solo lectura: el GET expone el estatus derivado sin mutar
+    el padrón. El proceso programado llama con ``persistir=True`` para ajustar
+    estatus y abrir alertas.
+    """
     umbral = configuracion_service.valor_decimal(
         "proveedor_minimo_a_tiempo_pct", Decimal("80")
     )
@@ -493,38 +498,44 @@ def evaluacion() -> dict:
     for proveedor in proveedores:
         grupo = entregas[proveedor.id]
         medido, aceptado = aceptacion.get(proveedor.id, (Decimal("0"), Decimal("0")))
-        a_tiempo = _porcentaje(grupo["a_tiempo"], grupo["evaluadas"])
+        recibidas = len(grupo["recibidas"])
+        a_tiempo = _porcentaje(grupo["a_tiempo"], recibidas)
         acept = _porcentaje(aceptado, medido)
-        if proveedor.estatus != "INACTIVO":
+        estatus = proveedor.estatus
+        if estatus != "INACTIVO":
             if a_tiempo < umbral:
-                if proveedor.estatus != "EN_REVISION":
-                    proveedor.estatus = "EN_REVISION"
-                    cambio = True
-                _abrir_o_reabrir(
-                    "PROVEEDOR_EN_REVISION",
-                    "Proveedor por debajo del porcentaje mínimo de entregas a tiempo",
-                    f"{proveedor.nombre_comercial} tiene {a_tiempo}% de entregas a tiempo.",
-                    proveedor.id,
-                    f"PROVEEDOR_EN_REVISION:{proveedor.id}",
-                )
-            elif proveedor.estatus == "EN_REVISION":
-                proveedor.estatus = "ACTIVO"
-                cambio = True
-                alerta = db.session.execute(
-                    select(Alerta).where(
-                        Alerta.clave_unica == f"PROVEEDOR_EN_REVISION:{proveedor.id}"
+                estatus = "EN_REVISION"
+                if persistir:
+                    if proveedor.estatus != "EN_REVISION":
+                        proveedor.estatus = "EN_REVISION"
+                        cambio = True
+                    _abrir_o_reabrir(
+                        "PROVEEDOR_EN_REVISION",
+                        "Proveedor por debajo del porcentaje mínimo de entregas a tiempo",
+                        f"{proveedor.nombre_comercial} tiene {a_tiempo}% de entregas a tiempo.",
+                        proveedor.id,
+                        f"PROVEEDOR_EN_REVISION:{proveedor.id}",
                     )
-                ).scalars().first()
-                if alerta is not None and alerta.estado == "ABIERTA":
-                    alerta.estado = "RESUELTA_AUTO"
-                    alerta.atendida_en = ahora_utc()
+            elif estatus == "EN_REVISION":
+                estatus = "ACTIVO"
+                if persistir:
+                    proveedor.estatus = "ACTIVO"
+                    cambio = True
+                    alerta = db.session.execute(
+                        select(Alerta).where(
+                            Alerta.clave_unica == f"PROVEEDOR_EN_REVISION:{proveedor.id}"
+                        )
+                    ).scalars().first()
+                    if alerta is not None and alerta.estado == "ABIERTA":
+                        alerta.estado = "RESUELTA_AUTO"
+                        alerta.atendida_en = ahora_utc()
         items.append(
             {
                 "proveedor_id": proveedor.id,
                 "razon_social": proveedor.razon_social,
                 "nombre_comercial": proveedor.nombre_comercial,
-                "estatus": proveedor.estatus,
-                "ordenes_recibidas": len(grupo["recibidas"]),
+                "estatus": estatus,
+                "ordenes_recibidas": recibidas,
                 "ordenes_evaluadas": grupo["evaluadas"],
                 "entregas_a_tiempo": grupo["a_tiempo"],
                 "porcentaje_a_tiempo": str(a_tiempo),

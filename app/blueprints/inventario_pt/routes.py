@@ -40,7 +40,7 @@ def _paginar(resultado, esquema):
 
 
 @inventario_pt_bp.get("/inventario/producto")
-@roles_requeridos("O")
+@roles_requeridos("OPERATIVO")
 def listar_inventario():
     filtros = _parametros(InventarioFiltrosSchema())
     pagina, por_pagina = parametros_paginacion()
@@ -50,7 +50,7 @@ def listar_inventario():
 
 
 @inventario_pt_bp.get("/inventario/producto/movimientos")
-@roles_requeridos("O")
+@roles_requeridos("OPERATIVO")
 def listar_movimientos():
     filtros = _parametros(MovimientosFiltrosSchema())
     pagina, por_pagina = parametros_paginacion()
@@ -61,17 +61,19 @@ def listar_movimientos():
 
 
 @inventario_pt_bp.post("/inventario/producto/ajuste")
-@roles_requeridos("O")
+@roles_requeridos("OPERATIVO")
 def registrar_ajuste():
     datos = cuerpo(AjusteSchema())
     ajuste = inventario_pt_service.ajuste(datos, usuario_actual().id)
-    return jsonify(AjusteResponseSchema().dump(ajuste)), 201
+    return jsonify(AjusteResponseSchema().dump(ajuste))
 
 
 @inventario_pt_bp.patch("/inventario/producto/<int:variante_id>/reglas")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def actualizar_reglas(variante_id):
-    datos = cuerpo(ReglasActualizarSchema())
+    datos = cuerpo(ReglasActualizarSchema(), parcial=True)
+    if not datos:
+        raise ApiError("VALIDACION", "Se requiere al menos una regla", 400)
     reglas = inventario_pt_service.actualizar_reglas(
         variante_id, datos, usuario_actual().id, ip=request.remote_addr
     )

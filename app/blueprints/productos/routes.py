@@ -17,6 +17,7 @@ from app.schemas.producto import (
 from app.security import roles_requeridos, usuario_actual
 from app.services import producto_service
 from app.utils.errores import ApiError
+from app.utils.paginacion import paginar_lista, parametros_paginacion
 from app.utils.validacion import cuerpo
 
 productos_bp = Blueprint("productos", __name__, url_prefix="/api/v1")
@@ -47,14 +48,16 @@ def _formulario(schema):
 
 
 @productos_bp.get("/productos")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def listar_productos():
     filtros = _parametros(ProductoFiltrosSchema())
-    return jsonify(ProductoListaAdminSchema(many=True).dump(producto_service.listar(filtros)))
+    pagina, por_pagina = parametros_paginacion()
+    items = ProductoListaAdminSchema(many=True).dump(producto_service.listar(filtros))
+    return jsonify(paginar_lista(items, pagina, por_pagina))
 
 
 @productos_bp.post("/productos")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def crear_producto():
     datos = cuerpo(ProductoCrearSchema())
     producto = producto_service.crear_producto(
@@ -64,7 +67,7 @@ def crear_producto():
 
 
 @productos_bp.get("/productos/<int:producto_id>")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def obtener_producto(producto_id):
     return jsonify(
         ProductoDetalleAdminSchema().dump(producto_service.obtener(producto_id))
@@ -72,7 +75,7 @@ def obtener_producto(producto_id):
 
 
 @productos_bp.patch("/productos/<int:producto_id>")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def actualizar_producto(producto_id):
     datos = cuerpo(ProductoActualizarSchema(), parcial=True)
     if not datos:
@@ -84,7 +87,7 @@ def actualizar_producto(producto_id):
 
 
 @productos_bp.delete("/productos/<int:producto_id>")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def desactivar_producto(producto_id):
     producto_service.desactivar(
         producto_id, usuario_actual().id, ip=request.remote_addr
@@ -93,7 +96,7 @@ def desactivar_producto(producto_id):
 
 
 @productos_bp.post("/productos/<int:producto_id>/imagenes")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def agregar_imagen(producto_id):
     archivo = request.files.get("archivo") or request.files.get("imagen")
     if archivo is None or not archivo.filename:
@@ -110,7 +113,7 @@ def agregar_imagen(producto_id):
 
 
 @productos_bp.patch("/variantes/<int:variante_id>")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def actualizar_variante(variante_id):
     datos = cuerpo(VarianteActualizarSchema())
     variante = producto_service.actualizar_variante(
@@ -120,7 +123,7 @@ def actualizar_variante(variante_id):
 
 
 @productos_bp.post("/productos/<int:producto_id>/activar")
-@roles_requeridos("A")
+@roles_requeridos("ADMIN")
 def activar_producto(producto_id):
     producto = producto_service.activar(
         producto_id, usuario_actual().id, ip=request.remote_addr
