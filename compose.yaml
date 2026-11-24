@@ -1,0 +1,79 @@
+name: unique
+
+services:
+  mysql:
+    image: mysql:8.4.3
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?Defina MYSQL_DATABASE en .env}
+      MYSQL_USER: ${MYSQL_USER:?Defina MYSQL_USER en .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Defina MYSQL_PASSWORD en .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Defina MYSQL_ROOT_PASSWORD en .env}
+      TZ: ${TZ:-America/Mexico_City}
+    ports:
+      - "${MYSQL_HOST_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - MYSQL_PWD="$$MYSQL_ROOT_PASSWORD" mysqladmin ping -h 127.0.0.1 -uroot --silent
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+      FLASK_APP: wsgi:app
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      DATABASE_URL: ${DATABASE_URL:?Defina DATABASE_URL en .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4200}
+      TZ: ${TZ:-America/Mexico_City}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "${API_HOST_PORT:-8000}:8000"
+    volumes:
+      - uploads_data:/var/lib/unique/uploads
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=4).status == 200 else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  phpmyadmin:
+    image: phpmyadmin:5.2.3
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: ${MYSQL_USER:?Defina MYSQL_USER en .env}
+      PMA_PASSWORD: ${MYSQL_PASSWORD:?Defina MYSQL_PASSWORD en .env}
+      UPLOAD_LIMIT: 2M
+      TZ: ${TZ:-America/Mexico_City}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "${PHPMYADMIN_PORT:-8080}:80"
+
+volumes:
+  mysql_data:
+  uploads_data:

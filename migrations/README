@@ -1,0 +1,5 @@
+Single-database configuration for Flask-Migrate.
+
+Las revisiones se generan con `flask db migrate -m "..."`. No se usa
+`db.create_all()` en produccion. Cada revision debe ser reversible o
+documentar explicitamente por que no lo es.
