@@ -25,4 +25,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=4).status == 200 else 1)"
 
-CMD ["sh", "-c", "python scripts/wait_for_db.py && exec gunicorn --bind ${APP_HOST:-0.0.0.0}:${APP_PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --access-logfile - --error-logfile - wsgi:app"]
+CMD ["sh", "-c", "python scripts/wait_for_db.py && exec gunicorn --bind ${APP_HOST:-0.0.0.0}:${APP_PORT:-8000} --workers ${WEB_CONCURRENCY:-1} --access-logfile - --error-logfile - wsgi:app"]
