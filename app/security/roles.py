@@ -43,6 +43,12 @@ def autenticacion_requerida(funcion):
     return envoltura
 
 
+def tiene_rol(rol: str) -> bool:
+    """Comprueba un rol con herencia de ADMIN sobre OPERATIVO."""
+    codigo = usuario_actual().rol.codigo
+    return codigo == rol or (codigo == "ADMIN" and rol == "OPERATIVO")
+
+
 def roles_requeridos(*roles: str):
     def decorador(funcion):
         @wraps(funcion)

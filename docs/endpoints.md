@@ -1,8 +1,8 @@
 # Contrato HTTP
 
-Prefijo global: `/api/v1`. Estado: Fases 0, 1 y 2 implementadas y verificadas. La Fase 2
-cubre cuenta, direcciones, medios de pago, cobertura de envío, catálogo, carrito, checkout
-simulado y pedidos del cliente (M02–M06). Los módulos M07–M21 y el resto de M22 se
+Prefijo global: `/api/v1`. Estado: Fases 0 a 4 implementadas y verificadas. La Fase 4
+cubre producción (M16) y mermas (M17), con PEPS, idempotencia, dictamen de calidad,
+asignación FIFO a pedidos y reversos. Los módulos M07–M09, M18–M21 y el resto de M22 se
 documentarán al implementarse.
 
 ## Endpoints implementados
@@ -269,7 +269,9 @@ clave y cuerpo devuelven la respuesta original; la misma clave con otro cuerpo r
 `aceptada <= pendiente`; el lote se crea solo con lo aceptado, la entrada se valora al costo real
 y lo rechazado se registra como merma. La orden pasa a `PARCIAL` o `RECIBIDA` según el acumulado
 y se cierra la alerta `OC_RETRASADA`. Una cotización exige que el proveedor surta cada material
-en su catálogo activo; elegir una cotización vencida responde `409 COTIZACION_VENCIDA`.
+en su catálogo activo; elegir una cotización vencida responde `409 COTIZACION_VENCIDA`. Desde
+la Fase 4, la recepción también reevalúa las órdenes de producción abiertas y cerró la
+dependencia pendiente con M16 que se registraba en Fase 3.
 
 ## M15 — Materiales e inventario de materia prima
 
@@ -295,6 +297,81 @@ negativo genera movimientos `AJUSTE`, no `CONSUMO`, para no inflar el consumo de
 
 Errores comunes de Fase 3: `401`, `403`, `404`, `409 ESTADO_INVALIDO`, `409 MATERIAL_INSUFICIENTE`,
 `409 IDEMPOTENCIA_CONFLICTO`, `422 MATERIAL_NO_DISPONIBLE`, `422 PROVEEDOR_NO_SURTE_MATERIAL`.
+
+## M16 — Producción
+
+| Método | Ruta | Rol | Parámetros / cuerpo | Respuesta |
+|---|---|---|---|---|
+| `GET` | `/produccion/ordenes` | A, O | `estado`, `semaforo`, `origen`, `q`, `desde`, `hasta`, paginación | Lista paginada de órdenes (`200`) |
+| `POST` | `/produccion/ordenes` | A, O | `lineas: [{variante_id, cantidad}]`, `fecha_requerida`, `notas` | Orden con folio `OP-AAAA-NNNN` y explosión de materiales (`201`) |
+| `GET` | `/produccion/ordenes/{id}` | A, O | — | Detalle con líneas, materiales y semáforo (`200`) |
+| `GET` | `/produccion/pendientes-produccion` | A, O | `semaforo`, paginación | Órdenes abiertas con unidades pendientes (`200`) |
+| `GET` | `/produccion/plan-sugerido` | A, O | `q` (SKU), paginación | Cantidad sugerida por variante (`200`) |
+| `POST` | `/produccion/ordenes/{id}/reservar` | A, O | — | Reserva disponible por material; orden `PLANEADA` o `LISTA` (`200`) |
+| `POST` | `/produccion/ordenes/{id}/solicitar-compra` | A, O | — | Requisición con folio `REQ-AAAA-NNNNNN` o la existente (`200`) |
+| `POST` | `/produccion/ordenes/{id}/iniciar` | A, O | `notas` opcional; cabecera `Idempotency-Key` obligatoria | Orden `EN_PROCESO` con consumo PEPS (`200`) |
+| `POST` | `/produccion/ordenes/{id}/revision` | A, O | `notas` opcional | Orden `EN_REVISION` (`200`) |
+| `POST` | `/produccion/ordenes/{id}/dictamen` | A, O | `lineas: [{orden_linea_id, cantidad_revisada, cantidad_aprobada, cantidad_reproceso, cantidad_merma, medidas_ok, costuras_ok, bordado_ok, etiquetas_ok, observaciones, causa_merma_id, etapa_merma}]` | Orden actualizada y asignaciones FIFO (`200`) |
+| `POST` | `/produccion/ordenes/{id}/cancelar` | A, O | `motivo` | Orden `CANCELADA` (`200`) |
+
+Ciclo de estados: `PLANEADA → LISTA → EN_PROCESO → EN_REVISION → CERRADA`. `CANCELADA`
+solo desde `PLANEADA` o `LISTA`. `reservar` calcula lo libre restando reservas de otras
+órdenes abiertas, actualiza el semáforo y mantiene `PLANEADA` si falta algo. `solicitar-compra`
+es idempotente por orden: devuelve `duplicada=true` si ya hay requisición vigente y nunca
+duplica faltantes. El semáforo es `VERDE` sin faltantes, `ROJO` si la fecha requerida ya pasó,
+hay OC vencida o la compra no cubre la falta, y `AMBAR` en los demás casos con faltantes.
+
+`POST /iniciar` usa el alcance `produccion:iniciar`. Bloquea orden y materiales/lotes en orden
+determinista, exige estado `LISTA`, consume por PEPS (`fecha_entrada`, `id`) y escribe movimientos
+`CONSUMO` con costo real por lote. Si un material no alcanza, revierte todo y responde
+`409 MATERIAL_INSUFICIENTE` con el detalle de requerido, disponible y faltante. La misma clave
+con el mismo cuerpo devuelve la respuesta original; con otro cuerpo responde
+`409 IDEMPOTENCIA_CONFLICTO`. Sin cabecera responde `400 IDEMPOTENCIA_REQUERIDA`.
+
+El dictamen exige `aprobadas + reproceso + merma = cantidad_revisada` (`422
+CANTIDADES_NO_CONCUADRAN`), no exceder lo planeado (`409 EXCEDE_PLANIFICADO`) y el checklist
+completo para aprobar (`422 CHECKLIST_INCOMPLETO`). Las aprobadas incrementan existencia con
+movimiento `PRODUCCION`; las mermas se delegan a M17 con `descontar=false` porque la unidad ya
+salió del lote de producción. Las unidades nuevas se asignan a pedidos `CONFIRMADO` o
+`EN_PRODUCCION` por antigüedad (FIFO) con movimiento `RESERVA`, y el pedido pasa a `CONFIRMADO`
+cuando se agota su pendiente. La orden queda `CERRADA`, `EN_PROCESO` si hay reproceso o
+`EN_REVISION` si aún faltan unidades por dictaminar.
+
+Errores: `400 IDEMPOTENCIA_REQUERIDA`, `401`, `403`, `404 ORDEN_NO_ENCONTRADA`/
+`LINEA_NO_ENCONTRADA`, `409 ESTADO_INVALIDO`/`MATERIAL_INSUFICIENTE`/`EXCEDE_PLANIFICADO`/
+`IDEMPOTENCIA_CONFLICTO`, `422 RECETA_NO_VIGENTE`/`ORDEN_SIN_MATERIALES`/`SIN_FALTANTES`/
+`SIN_RESERVA`/`LINEAS_REQUERIDAS`/`LINEA_DUPLICADA`/`CANTIDADES_NO_CONCUADRAN`/
+`CHECKLIST_INCOMPLETO`/`INVENTARIO_MATERIAL_NO_DISPONIBLE`.
+
+`OPERATIVO` recibe las mismas operaciones que `ADMIN`; los datos económicos de materiales siguen
+ocultos para `OPERATIVO` según M15.
+
+## M17 — Mermas
+
+| Método | Ruta | Rol | Parámetros / cuerpo | Respuesta |
+|---|---|---|---|---|
+| `GET` | `/mermas` | A, O | `origen`, `etapa`, `causa_id`, `variante_id`, `inventario_material_id`, `orden_produccion_id`, `desde`, `hasta`, paginación | Lista paginada (`200`) |
+| `POST` | `/mermas` | A, O | `origen`, `etapa`, `causa_id`, `cantidad`, `inventario_material_id`/`lote_id` o `variante_id`, `orden_produccion_id`, `descripcion`, `evidencia_url` | Merma (`201`) |
+| `GET` | `/mermas/{id}` | A, O | — | Merma (`200`) |
+| `POST` | `/mermas/{id}/reversar` | A | `motivo`, `evidencia_url` opcional | Original y reverso (`200`) |
+| `GET` | `/mermas/indicadores` | A | `desde`, `hasta`, `etapa`, `causa` | Resumen desde `v_merma_resumen` y totales (`200`) |
+
+M17 es el único dueño de la tabla `merma`: M14 (rechazo de recepción), M15 (ajuste negativo
+con `mandar_a_merma`) y M16 (dictamen) delegan en `merma_service`. `cantidad` es decimal para
+`MATERIAL` y entera para `PRODUCTO`. La causa debe estar activa y aplicar al origen indicado;
+si no se envía `causa_id`, se usa la primera causa válida. La merma de material descuenta el
+lote con movimiento `MERMA` y abre `MP_INSUFICIENTE`/`MERMA_ALTA` según corresponda.
+
+El reverso crea una **nueva fila** con `reversa_de_id`, nunca edita la original: devuelve el
+material con movimiento `REVERSA` o la prenda con movimiento `AJUSTE`, ambos con motivo y
+bitácora. No se puede reversar un reverso (`422 REVERSO_INVALIDO`) ni reversar dos veces
+(`409 MERMA_YA_REVERSADA`). `v_merma_resumen` netea los reversos con
+`CASE WHEN reversa_de_id IS NULL THEN 1 ELSE -1 END`, de modo que los indicadores y el total
+neto no cuentan dos veces el mismo evento. `OPERATIVO` no recibe `costo_perdido`.
+
+Errores: `401`, `403`, `404 MERMA_NO_ENCONTRADA`, `409 MERMA_YA_REVERSADA`/
+`LOTE_NO_DISPONIBLE`/`MATERIAL_INSUFICIENTE`, `422 ORIGEN_INVALIDO`/`ETAPA_INVALIDA`/
+`CANTIDAD_INVALIDA`/`CAUSA_MERMA_NO_DISPONIBLE`/`VARIANTE_REQUERIDA`/`REVERSO_INVALIDO`.
 
 ## M22 — Administración (parcial)
 
@@ -326,14 +403,12 @@ Errores comunes de Fase 3: `401`, `403`, `404`, `409 ESTADO_INVALIDO`, `409 MATE
 
 ## Pendiente
 
-Los blueprints M01–M06, M10–M15 y parte de M22 están documentados. Quedan pendientes M07–M09,
-M16–M21 y el resto de M22, además de las tareas programadas y el dashboard. La tabla completa
+Los blueprints M01–M06, M10–M17 y parte de M22 están documentados. Quedan pendientes M07–M09,
+M18–M21 y el resto de M22, además de las tareas programadas y el dashboard. La tabla completa
 de rutas requeridas está en la sección 11 del documento integral y en `AGENTS.md`.
 
-Pendientes concretos de Fase 3, registrados también en `decisiones-tecnicas.md`:
+Pendientes concretos, registrados también en `decisiones-tecnicas.md`:
 
-- Reevaluar reservas de órdenes de producción y alertas `MP_REORDEN` al recibir material
-  (depende de M16, Fase 4).
 - Cerrar órdenes de compra con faltante previa confirmación de `ADMIN`.
 - Exigir dos cotizaciones cuando exista proveedor alterno.
 - Restringir `UPDATE`/`DELETE` de tablas de movimientos con trigger o permisos de base de datos.

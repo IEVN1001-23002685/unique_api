@@ -288,7 +288,7 @@ def _reemplazar_lineas_requisicion(requisicion: Requisicion, lineas: list) -> No
         )
 
 
-def crear_requisicion(datos: dict, usuario_id: int, ip=None) -> dict:
+def crear_requisicion(datos: dict, usuario_id: int, ip=None, confirmar=True) -> dict:
     origen = datos.get("origen", "MANUAL")
     if origen not in ORIGENES:
         raise ApiError("ORIGEN_INVALIDO", "Origen de requisición inválido", 422)
@@ -313,11 +313,19 @@ def crear_requisicion(datos: dict, usuario_id: int, ip=None) -> dict:
         {"folio": requisicion.folio, "origen": origen},
         ip,
     )
-    db.session.commit()
+    if confirmar:
+        db.session.commit()
     return _serializar_requisicion(requisicion)
 
 
-def generar_requisicion(origen, faltantes, usuario_id, orden_produccion_id=None, notas=None):
+def generar_requisicion(
+    origen,
+    faltantes,
+    usuario_id,
+    orden_produccion_id=None,
+    notas=None,
+    confirmar=True,
+):
     """Crea una requisición a partir de faltantes detectados por otro módulo."""
     return crear_requisicion(
         {
@@ -327,6 +335,7 @@ def generar_requisicion(origen, faltantes, usuario_id, orden_produccion_id=None,
             "lineas": faltantes,
         },
         usuario_id,
+        confirmar=confirmar,
     )
 
 
@@ -859,6 +868,11 @@ def _registrar_recepcion_transaccion(usuario_id, datos, registro) -> dict:
     )
     orden.estado = "RECIBIDA" if todas else "PARCIAL"
     _cerrar_alerta_orden_retrasada(orden.id)
+    from app.services import produccion_service
+
+    produccion_service.reevaluar_ordenes_por_recepcion(
+        usuario_id, [linea.inventario_material_id for linea in lineas_orden.values()]
+    )
     respuesta = {
         "recepcion": _serializar_recepcion(recepcion),
         "orden_compra": {

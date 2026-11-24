@@ -5,6 +5,7 @@ from app.security.roles import (
     autenticacion_requerida,
     cargar_usuario_actual,
     roles_requeridos,
+    tiene_rol,
     usuario_actual,
 )
 from app.security.tokens import generar_token_opaco, hash_token
@@ -17,6 +18,7 @@ __all__ = [
     "hash_token",
     "necesita_rehash",
     "roles_requeridos",
+    "tiene_rol",
     "usuario_actual",
     "verificar_password",
 ]

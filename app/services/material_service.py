@@ -791,23 +791,25 @@ def registrar_rechazo_recepcion(
     if cantidad <= 0:
         raise ApiError("CANTIDAD_INVALIDA", "La cantidad rechazada debe ser mayor a cero", 422)
     causa = _causa_rechazo()
-    merma = Merma(
-        origen="MATERIAL",
-        inventario_material_id=inventario_id,
-        lote_id=None,
-        variante_id=None,
-        recepcion_linea_id=recepcion_linea_id,
-        etapa="RECEPCION",
-        causa_id=causa.id,
-        cantidad=cantidad,
-        costo_perdido=redondear(cantidad * _d(costo_unitario_base), "0.01"),
-        descripcion=motivo,
-        registrada_por=usuario_id,
-        fecha=ahora_utc(),
+    from app.services import merma_service
+
+    return merma_service.registrar_merma(
+        {
+            "origen": "MATERIAL",
+            "inventario_material_id": inventario_id,
+            "recepcion_linea_id": recepcion_linea_id,
+            "etapa": "RECEPCION",
+            "causa_id": causa.id,
+            "cantidad": cantidad,
+            "costo_total": redondear(cantidad * _d(costo_unitario_base), "0.01"),
+            "descripcion": motivo,
+            "fecha": ahora_utc(),
+            "folio_origen": f"recepción {recepcion_linea_id}",
+        },
+        usuario_id,
+        descontar=False,
+        confirmar=False,
     )
-    db.session.add(merma)
-    db.session.flush()
-    return merma
 
 
 def consumir_peps(
@@ -1027,18 +1029,24 @@ def ajustar(datos, usuario_id):
                     "No existe la causa de merma para el ajuste",
                     422,
                 )
-            db.session.add(
-                Merma(
-                    origen="MATERIAL",
-                    inventario_material_id=inventario.id,
-                    etapa="ALMACEN",
-                    causa_id=causa.id,
-                    cantidad=-diferencia,
-                    costo_perdido=sum((_d(item["costo_total"]) for item in consumos), Decimal("0")),
-                    descripcion=motivo,
-                    registrada_por=usuario_id,
-                    fecha=ahora_utc(),
-                )
+            from app.services import merma_service
+
+            merma_service.registrar_merma(
+                {
+                    "origen": "MATERIAL",
+                    "inventario_material_id": inventario.id,
+                    "etapa": "ALMACEN",
+                    "causa_id": causa.id,
+                    "cantidad": -diferencia,
+                    "costo_total": sum(
+                        (_d(item["costo_total"]) for item in consumos), Decimal("0")
+                    ),
+                    "descripcion": motivo,
+                    "fecha": ahora_utc(),
+                },
+                usuario_id,
+                descontar=False,
+                confirmar=False,
             )
             destino = "MERMA"
 

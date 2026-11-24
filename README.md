@@ -2,10 +2,11 @@
 
 Backend REST de UNIQUE (Flask + MySQL), construido según `UNIQUE_documento_integral_v3.txt`.
 
-**Estado actual: Fase 2 verificada.** La Fase 0 (infraestructura), la Fase 1 (modelo completo,
-migraciones, vistas, semillas, autenticación JWT y administración básica) y la Fase 2 (cuenta,
-catálogo, carrito, checkout simulado y pedidos del cliente) están implementadas y probadas
-contra MySQL. Las fases restantes se implementarán de forma incremental.
+**Estado actual: Fase 4 verificada.** La Fase 0 (infraestructura), la Fase 1 (modelo completo,
+migraciones, vistas, semillas, autenticación JWT y administración básica), la Fase 2 (cuenta,
+catálogo, carrito, checkout simulado y pedidos del cliente), la Fase 3 (productos, recetas,
+proveedores, compras y materia prima) y la Fase 4 (producción y mermas) están implementadas y
+probadas contra MySQL. Las fases restantes se implementarán de forma incremental.
 
 ## Requisitos
 
@@ -65,10 +66,11 @@ docker compose exec api python -m pytest -q
 Si la API no conecta con MySQL: `docker compose exec api python scripts/diagnose_db.py`.
 Cualquier cambio en código requiere `docker compose build` antes de `up -d`.
 
-`flask db upgrade` aplica las revisiones de Fase 1 (modelo completo, vistas e índices). Las
-Fases 2 y 3 no añadieron tablas funcionales: reutilizan el modelo y la tabla de infraestructura
-`idempotencia_operacion` (alcances `checkout:pagar` y `recepciones:registrar`). Después ejecute
-las semillas, que son idempotentes:
+`flask db upgrade` aplica tres revisiones: Fase 1 (modelo completo, vistas e índices), vistas de
+lectura y `b2c3d4e5f6a7` (reversos de merma y neteo de `v_merma_resumen`). Las Fases 2, 3 y 4 no
+añadieron tablas funcionales: reutilizan el modelo y la tabla de infraestructura
+`idempotencia_operacion` (alcances `checkout:pagar`, `recepciones:registrar` y
+`produccion:iniciar`). Después ejecute las semillas, que son idempotentes:
 
 ```bash
 docker compose exec api python -m scripts.seed
@@ -88,9 +90,12 @@ No hay contraseñas fijas en el código ni en las semillas.
 La Fase 3 está cubierta por `tests/integration/test_fase3_productos.py`,
 `test_fase3_materiales.py` y `test_fase3_compras.py`: SKU y folios, activación de productos y
 recetas, receta `VIGENTE` no editable, ajustes con movimientos inmutables, PEPS, recepciones
-idempotentes con merma por rechazo, permisos Admin/Operativo y ocultamiento de costos. La suite
-completa es `54 passed`. Las imágenes se guardan en el volumen de uploads, se validan con Pillow
-y se rechazan si superan 2 MB.
+idempotentes con merma por rechazo, permisos Admin/Operativo y ocultamiento de costos. La Fase 4
+añade `tests/integration/test_fase4_produccion_mermas.py`: ciclo completo de orden de producción,
+reserva y semáforo, solicitud de compra, inicio idempotente con PEPS, rollback con material
+insuficiente, dictamen con asignación FIFO a pedidos, reverso de mermas e indicadores,roles y
+transiciones inválidas. La suite completa verificada es `59 passed`. Las imágenes se guardan en
+el volumen de uploads, se validan con Pillow y se rechazan si superan 2 MB.
 
 ## Detener y reiniciar
 

@@ -516,6 +516,11 @@ def _lineas_calculadas(lineas) -> list:
     return resultado
 
 
+def lineas_calculadas(lineas) -> list:
+    """Expone el cálculo de cantidades brutas para otros módulos (M16)."""
+    return _lineas_calculadas(lineas)
+
+
 def _disponible_material(material_id: int, color_id: int) -> Decimal:
     fisico = db.session.scalar(
         select(func.coalesce(func.sum(LoteMaterial.cantidad_base_disponible), 0))

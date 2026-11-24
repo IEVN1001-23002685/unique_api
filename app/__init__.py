@@ -12,7 +12,9 @@ from app.blueprints.cuenta import cuenta_bp
 from app.blueprints.health import health_bp
 from app.blueprints.inventario_mp import inventario_mp_bp
 from app.blueprints.inventario_pt import inventario_pt_bp
+from app.blueprints.mermas import mermas_bp
 from app.blueprints.mis_pedidos import mis_pedidos_bp
+from app.blueprints.produccion import produccion_bp
 from app.blueprints.productos import productos_bp
 from app.blueprints.proveedores import proveedores_bp
 from app.blueprints.recetas import recetas_bp
@@ -46,6 +48,8 @@ def create_app(configuracion=None) -> Flask:
     app.register_blueprint(proveedores_bp)
     app.register_blueprint(inventario_mp_bp)
     app.register_blueprint(compras_bp)
+    app.register_blueprint(produccion_bp)
+    app.register_blueprint(mermas_bp)
     app.register_blueprint(admin_bp)
     _registrar_cabeceras_de_seguridad(app)
 

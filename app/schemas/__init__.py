@@ -125,8 +125,30 @@ from app.schemas.receta import (
     RecetaPrevisualizarSchema,
     RecetaPreviewSchema,
 )
+from app.schemas.merma import (
+    IndicadoresFiltrosSchema,
+    MermaCrearSchema,
+    MermaFiltrosSchema,
+    MermaReversarSchema,
+)
+from app.schemas.produccion import (
+    CancelarOrdenSchema,
+    DictamenSchema,
+    OrdenCrearSchema,
+    OrdenFiltrosSchema,
+    RevisionSchema,
+)
 
 __all__ = [
+    "CancelarOrdenSchema",
+    "DictamenSchema",
+    "IndicadoresFiltrosSchema",
+    "MermaCrearSchema",
+    "MermaFiltrosSchema",
+    "MermaReversarSchema",
+    "OrdenCrearSchema",
+    "OrdenFiltrosSchema",
+    "RevisionSchema",
     "AjusteMaterialSchema",
     "AjusteResponseSchema",
     "AjusteSchema",

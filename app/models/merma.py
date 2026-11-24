@@ -20,6 +20,7 @@ class Merma(ModeloBase):
         ),
         db.CheckConstraint("cantidad >= 0", name="ck_merma_cantidad"),
         db.CheckConstraint("costo_perdido >= 0", name="ck_merma_costo"),
+        db.UniqueConstraint("reversa_de_id", name="uq_merma_reversa"),
         db.Index("ix_merma_fecha", "fecha"),
         db.Index("ix_merma_causa", "causa_id", "etapa"),
     )
@@ -41,6 +42,9 @@ class Merma(ModeloBase):
     devolucion_linea_id = db.Column(
         entero_unsigned(), db.ForeignKey("devolucion_linea.id"), nullable=True
     )
+    reversa_de_id = db.Column(
+        entero_unsigned(), db.ForeignKey("merma.id"), nullable=True
+    )
     etapa = db.Column(db.String(20), nullable=False)
     causa_id = db.Column(entero_unsigned(), db.ForeignKey("causa_merma.id"), nullable=False)
     cantidad = db.Column(db.Numeric(12, 4), nullable=False)
@@ -52,3 +56,4 @@ class Merma(ModeloBase):
 
     causa = db.relationship("CausaMerma", foreign_keys=[causa_id])
     registrador = db.relationship("Usuario", foreign_keys=[registrada_por])
+    reversa_de = db.relationship("Merma", foreign_keys=[reversa_de_id], remote_side=lambda: [Merma.id])

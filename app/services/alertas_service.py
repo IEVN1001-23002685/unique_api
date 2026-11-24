@@ -40,6 +40,17 @@ def abrir(
     return alerta
 
 
+def cerrar(clave_unica: str) -> bool:
+    """Cierra por clave de negocio cuando la condición desaparece."""
+    alerta = db.session.execute(
+        select(Alerta).where(Alerta.clave_unica == clave_unica)
+    ).scalars().first()
+    if alerta is None or alerta.estado != "ABIERTA":
+        return False
+    alerta.estado = "RESUELTA_AUTO"
+    return True
+
+
 def evaluar_variantes(variante_ids) -> None:
     """Abre alertas de producto terminado después de reservar existencias."""
     if not variante_ids:

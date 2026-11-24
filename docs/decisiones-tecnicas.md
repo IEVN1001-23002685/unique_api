@@ -45,13 +45,30 @@ confirmación del equipo.
 | Listados en memoria | `/productos`, `/recetas`, `/disenos`, `/proveedores/{id}/materiales` y `/cotizaciones` se paginan en la capa HTTP con `{items,total,pagina,por_pagina}`. No se añadió `LIMIT/OFFSET` en servicio porque estos catálogos son pequeños; se revisará si crecen. | Implementado |
 | Evaluación de proveedores | `GET /proveedores/evaluacion` es de solo lectura y devuelve el estatus derivado. La mutación de estatus y la alerta `PROVEEDOR_EN_REVISION` se dejan para la tarea diaria `evaluar_proveedores` (Fase 6). El porcentaje divide entre órdenes **recibidas**, no entre órdenes con `fecha_prometida`; sin historial se reporta `100.00` para no penalizar sin evidencia. | Decidido; tarea pendiente |
 | Cotizaciones | El proveedor debe tener el material en su catálogo activo para cotizar. Elegir una cotización con `vigencia_hasta` vencida responde `409`. El mínimo de dos cotizaciones cuando hay alterno y el plazo de entrega por proveedor quedan pendientes: el documento no fija regla operativa completa. | Parcial; pendiente de confirmar |
-| Recepción y reservas de producción | La recepción cierra `OC_RETRASADA`, crea lotes por lo aceptado y genera merma por el rechazo. La reevaluación de órdenes `PLANEADA` y de alertas `MP_REORDEN` requiere M16 y se implementará en Fase 4. | Pendiente (Fase 4) |
+| Recepción y reservas de producción | La recepción cierra `OC_RETRASADA`, crea lotes por lo aceptado y genera merma por el rechazo. Desde Fase 4 también reintenta reservas de órdenes `PLANEADA` y cierra `MP_REORDEN` mediante `produccion_service.reevaluar_ordenes_por_recepcion`. | Implementado en Fase 4 |
 | Cierre de OC con faltante | El documento permite cerrar con faltante con confirmación de `ADMIN`, pero no define el estado final ni el efecto en la requisición. No se implementa una regla inventada. | Pendiente de confirmar |
 | Inmutabilidad de movimientos | Las rutas solo insertan movimientos y las correcciones usan movimientos inversos. No hay `UPDATE`/`DELETE` expuestos, pero la restricción aún no existe en la base; se añadirá con trigger o `GRANT` en una migración. | Parcial |
 | Tipo de movimiento en ajuste MP | `consumir_peps` acepta el tipo de movimiento. Los ajustes negativos escriben `AJUSTE` para no contaminar el consumo de 30 días que alimenta el punto de reorden. | Corregido |
-| Dueño de la merma | M13/M15 registran mermas de recepción y ajuste con `CausaMerma`, pero la creación centralizará en el servicio de M17 cuando ese módulo se implemente en Fase 4. | Pendiente (Fase 4) |
+| Dueño de la merma | M13/M15 registran mermas de recepción y ajuste con `CausaMerma`; desde Fase 4 M14, M15 y M16 delegan la creación en `merma_service` (M17), con `confirmar=False` cuando participan en una transacción ajena. | Implementado en Fase 4 |
 | Alcance de idempotencia en recepciones | `recepciones:registrar`, separado de `checkout:pagar`. Un error persistido con la misma clave no sobrescribe una respuesta `COMPLETADA`. | Implementado |
 | Imágenes | Se valida contenido real, MIME declarado y tamaño máximo de 2 MB antes de confirmar. Si falla la transacción después de escribir el archivo, se elimina el archivo huérfano. | Implementado |
+
+## Fase 4 (M16–M17)
+
+| Tema | Decisión | Estado |
+|---|---|---|
+| Semáforo de orden | El documento usa `ÁMBAR`; los códigos no llevan acentos, por lo que se serializa `AMBAR`. Los tres valores son `VERDE`, `AMBAR` y `ROJO`. | Normalizado; confirmar con el frontend |
+| `GET /pedidos/pendientes-produccion` | `AGENTS.md` lo lista en M09, pero la información pertenece a las órdenes de M16. En Fase 4 se expone `/produccion/pendientes-produccion` y se devuelven órdenes abiertas con unidades pendientes. La ruta canónica de M09 se evaluará en Fase 5 sin duplicar la lógica. | Normalizado; pendiente de M09 |
+| Reverso de merma | No se edita ni borra la merma original: se inserta una nueva fila con `reversa_de_id` único. La migración `b2c3d4e5f6a7` ajustó `v_merma_resumen` para netear reversos (`+1`/`-1`), de modo que los indicadores no dupliquen el evento. | Implementado |
+| Movimiento inverso | El reverso de material escribe `movimiento_material.tipo = REVERSA`; el de producto escribe `movimiento_producto.tipo = AJUSTE`, porque el dominio de movimientos de producto de Fase 1 no incluye `REVERSA`. Ambos llevan `documento_tipo = MERMA`, motivo y bitácora. | Implementado |
+| Merma del dictamen | Las unidades mermadas en calidad se registran con `descontar=False`: el material ya se consumió por PEPS al iniciar y la merma es de producto terminado no aprobado. La fila de merma es de `PRODUCTO` y no vuelve a descontar stock. | Implementado |
+| Inicio de producción | Exige orden `LISTA`. Solo se consumen materiales con reserva; el faltante queda pendiente y se atiende con `solicitar-compra` o una nueva recepción. Si falta PEPS para lo reservado, se revierte todo y se responde `MATERIAL_INSUFICIENTE`. | Implementado |
+| Alcance de idempotencia | Inicio de producción usa `produccion:iniciar` en `idempotencia_operacion`, separado de `checkout:pagar` y `recepciones:registrar`. Un error persistido no sobrescribe una respuesta completada. | Implementado |
+| Solicitud de compra | Si la orden ya tiene requisición `PENDIENTE`, `AUTORIZADA` o `COMPRA_EMITIDA`, se reutiliza y se responde `duplicada=true`. El documento no define el comportamiento ante solicitudes repetidas; se evita duplicar la demanda. | Decidido; pendiente de confirmar |
+| Asignación de producido a pedidos | Las unidades aprobadas se reservan para pedidos `CONFIRMADO`/`EN_PRODUCCION` ordenados por `creado_en`, `id` y `pedido_linea.id`. El histórico de `venta_linea` no se modifica; solo cambian `cant_reservada`/`cant_pendiente` y el estado del pedido cuando se agota lo pendiente. | Implementado |
+| Cierre de la orden | Se cierra cuando todas las líneas tienen `aprobadas + merma = planeada`; vuelve a `EN_PROCESO` si hay reproceso y permanece `EN_REVISION` si faltan unidades por dictaminar. El reproceso se registra pero no crea merma ni PT. | Implementado |
+| Checklist de calidad | El documento enumera medidas, costuras, bordado y etiquetas. No se pueden aprobar unidades si alguno de los cuatro indicadores es `false`; el bloqueo responde `422 CHECKLIST_INCOMPLETO`. | Decidido |
+| Causa de merma por defecto | Si el dictamen no envía `causa_merma_id`, se usa una causa activa válida para `PRODUCTO` (por defecto «Defecto de acabado»). No se inventa una causa nueva. | Decidido |
 
 ## Convención de nombres
 

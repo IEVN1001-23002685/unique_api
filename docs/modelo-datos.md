@@ -44,7 +44,9 @@ Creadas en la migración `7c1f9d2a4b60_vistas_de_lectura.py`:
   de 30 días o manual y punto de reorden por material y color.
 - `v_capacidad_variante`: número máximo de prendas alcanzables según la receta vigente.
 - `v_ventas_sku`: unidades e ingresos por fecha, SKU, categoría, talla y color.
-- `v_merma_resumen`: merma por fecha, etapa, causa, producto y material con costo perdido.
+- `v_merma_resumen`: merma por fecha, etapa, causa, producto y material con costo perdido. La
+  migración `b2c3d4e5f6a7` la ajustó para netear reversos con
+  `CASE WHEN me.reversa_de_id IS NULL THEN 1 ELSE -1 END`.
 - `v_pedidos_estancados`: pedidos que superan el umbral de su estado en `configuracion`.
 
 ## Uso de tablas en Fase 3
@@ -67,6 +69,28 @@ definidos en Fase 1. Las relaciones que se apoyan en las reglas de negocio son:
 rutas de edición y las correcciones son movimientos inversos con motivo. La restricción a nivel
 de base de datos (trigger o `GRANT`) queda registrada como pendiente en `decisiones-tecnicas.md`.
 
+## Uso de tablas en Fase 4
+
+Fase 4 tampoco añadió tablas funcionales; la migración `b2c3d4e5f6a7` solo agregó
+`merma.reversa_de_id` (UNIQUE nullable, FK a `merma.id`) y actualizó `v_merma_resumen`.
+Las relaciones nuevas que se apoyan en el modelo de Fase 1 son:
+
+- `orden_produccion` → `orden_produccion_linea` → `revision_calidad`. El folio `OP` se genera
+  con `secuencia_folio` dentro de la transacción de creación.
+- `orden_produccion` → `orden_material` → `inventario_material` → `lote_material`. Las reservas
+  se contabilizan en `orden_material.cantidad_reservada` y el consumo PEPS descuenta
+  `lote_material.cantidad_base_disponible` con movimientos `CONSUMO`.
+- `produccion_pedido` vincula una línea de orden con un `pedido_linea` cuando la demanda
+  pendiente de un SKU se acumula en una orden abierta.
+- El dictamen incrementa `stock_variante.existencia` con movimiento `PRODUCCION` y reserva
+  unidades para pedidos antiguos con `RESERVA`, sin alterar el histórico de `venta_linea`.
+- `merma.reversa_de_id` permite reversos sin borrar ni editar la merma original. Un reverso de
+  material escribe `movimiento_material.tipo = REVERSA`; uno de producto escribe
+  `movimiento_producto.tipo = AJUSTE`, ambos con documento_tipo `MERMA`.
+
+La idempotencia de inicio de producción usa la misma tabla `idempotencia_operacion` con
+alcance `produccion:iniciar`.
+
 ## Migraciones
 
 El entorno Alembic ya existe en `migrations/`. No se usa `db.create_all()` en producción.
@@ -74,6 +98,8 @@ Revisiones aplicadas:
 
 1. `3baed16b1d4b` — `Fase 1 modelo de datos` (65 tablas, restricciones, índices y claves foráneas).
 2. `7c1f9d2a4b60` — `Vistas de lectura del documento funcional`.
+3. `b2c3d4e5f6a7` — `Reversos de merma y vista neta` (columna `reversa_de_id` y ajuste de
+   `v_merma_resumen`).
 
 Elaboración: `docker compose exec api flask db migrate -m "descripcion"`;
 aplicación: `docker compose exec api flask db upgrade`.
