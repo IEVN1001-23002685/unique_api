@@ -2,9 +2,10 @@
 
 Backend REST de UNIQUE (Flask + MySQL), construido según `UNIQUE_documento_integral_v3.txt`.
 
-**Estado actual: Fase 1 en verificación.** La Fase 0 (infraestructura) quedó verificada. La Fase 1
-ya creó el modelo completo, migraciones, vistas, semillas, autenticación JWT y administración
-básica; se ejecutarán las pruebas antes de declararla terminada.
+**Estado actual: Fase 2 verificada.** La Fase 0 (infraestructura), la Fase 1 (modelo completo,
+migraciones, vistas, semillas, autenticación JWT y administración básica) y la Fase 2 (cuenta,
+catálogo, carrito, checkout simulado y pedidos del cliente) están implementadas y probadas
+contra MySQL. Las fases restantes se implementarán de forma incremental.
 
 ## Requisitos
 
@@ -64,8 +65,9 @@ docker compose exec api python -m pytest -q
 Si la API no conecta con MySQL: `docker compose exec api python scripts/diagnose_db.py`.
 Cualquier cambio en código requiere `docker compose build` antes de `up -d`.
 
-`flask db upgrade` aplica las revisiones de Fase 1 (modelo completo y vistas). Después ejecute
-las semillas, que son idempotentes:
+`flask db upgrade` aplica las revisiones de Fase 1 (modelo completo, vistas e índices). La
+Fase 2 no añadió tablas funcionales: reutiliza el modelo y la tabla de infraestructura
+`idempotencia_operacion`. Después ejecute las semillas, que son idempotentes:
 
 ```bash
 docker compose exec api python -m scripts.seed

@@ -6,7 +6,20 @@ from sqlalchemy import create_engine, text
 
 from app import create_app
 from app.extensions import db
-from app.models import Bitacora, RecuperacionContrasena, Rol, TokenRefresco, Usuario
+from app.models import (
+    Bitacora,
+    CategoriaProducto,
+    Color,
+    Producto,
+    RecuperacionContrasena,
+    Receta,
+    Rol,
+    StockVariante,
+    Talla,
+    TokenRefresco,
+    Usuario,
+    VarianteProducto,
+)
 from app.security.password import generar_hash
 
 
@@ -101,3 +114,265 @@ def headers_operativo(client, crear_usuario):
 def headers_cliente(client, crear_usuario):
     usuario = crear_usuario("CLIENTE")
     return iniciar_sesion(client, usuario["correo"], usuario["password"])
+
+
+@pytest.fixture
+def tienda(app, mysql_disponible):
+    """Datos aislados de catálogo, clientes e idempotencia para Fase 2."""
+    usuarios = []
+    variantes = []
+    productos = []
+    claves_idempotencia = []
+
+    def crear_producto(existencia=0, precio="100.00", permite_bajo_pedido=False):
+        with app.app_context():
+            categoria = db.session.query(CategoriaProducto).filter_by(
+                prefijo_sku="PL"
+            ).one()
+            talla = db.session.query(Talla).filter_by(codigo="CH").one()
+            color = db.session.query(Color).filter_by(codigo="GR").one()
+            sufijo = secrets.token_hex(3).upper()
+            producto = Producto(
+                categoria_id=categoria.id,
+                codigo_sku=sufijo[:4],
+                nombre=f"Prueba {sufijo}",
+                descripcion="Producto de prueba",
+                composicion_textil="Algodón",
+                guia_medidas="",
+                precio_venta=precio,
+                permite_bajo_pedido=permite_bajo_pedido,
+                activo=True,
+            )
+            db.session.add(producto)
+            db.session.flush()
+            variante = VarianteProducto(
+                producto_id=producto.id,
+                talla_id=talla.id,
+                color_id=color.id,
+                sku=f"TST-{sufijo}",
+                activa=True,
+            )
+            db.session.add(variante)
+            db.session.flush()
+            db.session.add(
+                StockVariante(
+                    variante_id=variante.id,
+                    existencia=existencia,
+                    reservado=0,
+                    stock_minimo=1,
+                    cantidad_reposicion=20,
+                )
+            )
+            db.session.add(
+                Receta(
+                    producto_id=producto.id,
+                    talla_id=talla.id,
+                    version=1,
+                    estado="VIGENTE",
+                )
+            )
+            db.session.commit()
+            productos.append(producto.id)
+            variantes.append(variante.id)
+            return {"producto_id": producto.id, "variante_id": variante.id}
+
+    def crear_cliente(rol="CLIENTE"):
+        correo = f"tienda-{secrets.token_hex(6)}@example.com"
+        password = "ClaveSegura123!"
+        with app.app_context():
+            rol_obj = db.session.query(Rol).filter_by(codigo=rol).one()
+            usuario = Usuario(
+                rol_id=rol_obj.id,
+                nombre="Tienda",
+                apellidos="Prueba",
+                correo=correo,
+                telefono="1234567890",
+                password_hash=generar_hash(password),
+                estado_cuenta="ACTIVA",
+                intentos_fallidos=0,
+                acepta_promociones=False,
+            )
+            db.session.add(usuario)
+            db.session.commit()
+            usuarios.append(usuario.id)
+            return {"id": usuario.id, "correo": correo, "password": password}
+
+    yield {"crear_producto": crear_producto, "crear_cliente": crear_cliente}
+
+    with app.app_context():
+        if not usuarios and not variantes:
+            return
+        if usuarios:
+            db.session.execute(
+                text(
+                    "DELETE FROM carrito_linea WHERE carrito_id IN "
+                    "(SELECT id FROM carrito WHERE usuario_id IN :ids)"
+                ).bindparams(db.bindparam("ids", usuarios, expanding=True))
+            )
+        if variantes:
+            db.session.execute(
+                text("DELETE FROM carrito_linea WHERE variante_id IN :ids").bindparams(
+                    db.bindparam("ids", variantes, expanding=True)
+                )
+            )
+        ventas = [
+            fila[0]
+            for fila in db.session.execute(
+                text("SELECT id FROM venta WHERE usuario_id IN :ids").bindparams(
+                    db.bindparam("ids", usuarios, expanding=True)
+                )
+            ).all()
+        ] if usuarios else []
+        pedidos = []
+        if ventas:
+            pedidos = [
+                fila[0]
+                for fila in db.session.execute(
+                    text("SELECT id FROM pedido WHERE venta_id IN :ids").bindparams(
+                        db.bindparam("ids", ventas, expanding=True)
+                    )
+                ).all()
+            ]
+            pedido_lineas = [
+                fila[0]
+                for fila in db.session.execute(
+                    text("SELECT id FROM pedido_linea WHERE pedido_id IN :ids").bindparams(
+                        db.bindparam("ids", pedidos, expanding=True)
+                    )
+                ).all()
+            ]
+            preparaciones = [
+                fila[0]
+                for fila in db.session.execute(
+                    text("SELECT id FROM preparacion WHERE pedido_id IN :ids").bindparams(
+                        db.bindparam("ids", pedidos, expanding=True)
+                    )
+                ).all()
+            ]
+            ordenes = [
+                fila[0]
+                for fila in db.session.execute(
+                    text(
+                        "SELECT DISTINCT l.orden_id FROM produccion_pedido p "
+                        "JOIN orden_produccion_linea l ON l.id = p.orden_linea_id "
+                        "WHERE p.pedido_linea_id IN :ids"
+                    ).bindparams(db.bindparam("ids", pedido_lineas, expanding=True))
+                ).all()
+            ] if pedido_lineas else []
+            for tabla, columna, ids in (
+                ("preparacion_linea", "preparacion_id", preparaciones),
+                ("produccion_pedido", "pedido_linea_id", pedido_lineas),
+                ("pedido_evento", "pedido_id", pedidos),
+                ("pedido_linea", "pedido_id", pedidos),
+                ("preparacion", "pedido_id", pedidos),
+            ):
+                if ids:
+                    db.session.execute(
+                        text(f"DELETE FROM {tabla} WHERE {columna} IN :ids").bindparams(
+                            db.bindparam("ids", ids, expanding=True)
+                        )
+                    )
+            if ordenes:
+                lineas_orden = [
+                    fila[0]
+                    for fila in db.session.execute(
+                        text(
+                            "SELECT id FROM orden_produccion_linea WHERE orden_id IN :ids"
+                        ).bindparams(db.bindparam("ids", ordenes, expanding=True))
+                    ).all()
+                ]
+                if lineas_orden:
+                    db.session.execute(
+                        text(
+                            "DELETE FROM orden_produccion_linea WHERE id IN :ids"
+                        ).bindparams(db.bindparam("ids", lineas_orden, expanding=True))
+                    )
+                db.session.execute(
+                    text("DELETE FROM orden_produccion WHERE id IN :ids").bindparams(
+                        db.bindparam("ids", ordenes, expanding=True)
+                    )
+                )
+            db.session.execute(text("DELETE FROM pedido WHERE id IN :ids").bindparams(
+                db.bindparam("ids", pedidos, expanding=True)
+            ))
+            for tabla in ("pago", "venta_direccion", "venta_linea"):
+                db.session.execute(
+                    text(f"DELETE FROM {tabla} WHERE venta_id IN :ids").bindparams(
+                        db.bindparam("ids", ventas, expanding=True)
+                    )
+                )
+            db.session.execute(text("DELETE FROM venta WHERE id IN :ids").bindparams(
+                db.bindparam("ids", ventas, expanding=True)
+            ))
+
+        if variantes:
+            db.session.execute(
+                text("DELETE FROM movimiento_producto WHERE variante_id IN :ids").bindparams(
+                    db.bindparam("ids", variantes, expanding=True)
+                )
+            )
+            db.session.execute(
+                text(
+                    "DELETE FROM alerta WHERE entidad_tipo = 'variante_producto' "
+                    "AND entidad_id IN :ids"
+                ).bindparams(db.bindparam("ids", variantes, expanding=True))
+            )
+            db.session.execute(
+                text("DELETE FROM stock_variante WHERE variante_id IN :ids").bindparams(
+                    db.bindparam("ids", variantes, expanding=True)
+                )
+            )
+            db.session.execute(
+                text("DELETE FROM variante_producto WHERE id IN :ids").bindparams(
+                    db.bindparam("ids", variantes, expanding=True)
+                )
+            )
+        if productos:
+            recetas = [
+                fila[0]
+                for fila in db.session.execute(
+                    text("SELECT id FROM receta WHERE producto_id IN :ids").bindparams(
+                        db.bindparam("ids", productos, expanding=True)
+                    )
+                ).all()
+            ]
+            if recetas:
+                for tabla in ("receta_linea", "receta_bordado"):
+                    db.session.execute(
+                        text(f"DELETE FROM {tabla} WHERE receta_id IN :ids").bindparams(
+                            db.bindparam("ids", recetas, expanding=True)
+                        )
+                    )
+                db.session.execute(
+                    text("DELETE FROM receta WHERE id IN :ids").bindparams(
+                        db.bindparam("ids", recetas, expanding=True)
+                    )
+                )
+            db.session.execute(
+                text("DELETE FROM producto WHERE id IN :ids").bindparams(
+                    db.bindparam("ids", productos, expanding=True)
+                )
+            )
+        db.session.execute(
+            text(
+                "DELETE FROM idempotencia_operacion WHERE clave LIKE 'test-%' "
+                "OR clave IN :ids"
+            ).bindparams(db.bindparam("ids", claves_idempotencia or [""], expanding=True))
+        )
+        if usuarios:
+            for tabla in ("token_refresco", "recuperacion_contrasena", "bitacora"):
+                db.session.execute(
+                    text(f"DELETE FROM {tabla} WHERE usuario_id IN :ids").bindparams(
+                        db.bindparam("ids", usuarios, expanding=True)
+                    )
+                )
+            for tabla in ("carrito", "direccion", "medio_pago"):
+                db.session.execute(
+                    text(f"DELETE FROM {tabla} WHERE usuario_id IN :ids").bindparams(
+                        db.bindparam("ids", usuarios, expanding=True)
+                    )
+                )
+            db.session.execute(text("DELETE FROM usuario WHERE id IN :ids").bindparams(
+                db.bindparam("ids", usuarios, expanding=True)
+            ))
+        db.session.commit()

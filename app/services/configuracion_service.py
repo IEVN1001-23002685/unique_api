@@ -1,10 +1,32 @@
 """Lectura y escritura de parámetros de configuración del sistema."""
 
+from decimal import Decimal, InvalidOperation
+
 from sqlalchemy import select
 
 from app.extensions import db
 from app.models import Bitacora, Configuracion
 from app.utils.errores import ApiError
+
+
+def valor_entero(clave: str, predeterminado: int) -> int:
+    fila = db.session.get(Configuracion, clave)
+    if fila is None:
+        return predeterminado
+    try:
+        return int(Decimal(fila.valor))
+    except (InvalidOperation, ValueError):
+        return predeterminado
+
+
+def valor_decimal(clave: str, predeterminado):
+    fila = db.session.get(Configuracion, clave)
+    if fila is None:
+        return Decimal(str(predeterminado))
+    try:
+        return Decimal(fila.valor)
+    except InvalidOperation:
+        return Decimal(str(predeterminado))
 
 
 def listar_configuracion():

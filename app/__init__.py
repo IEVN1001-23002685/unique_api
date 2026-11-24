@@ -4,8 +4,12 @@ from flask import Flask
 
 from app.blueprints.admin import admin_bp
 from app.blueprints.auth import auth_bp
+from app.blueprints.carrito import carrito_bp
+from app.blueprints.catalogo import catalogo_bp
+from app.blueprints.checkout import checkout_bp
 from app.blueprints.cuenta import cuenta_bp
 from app.blueprints.health import health_bp
+from app.blueprints.mis_pedidos import mis_pedidos_bp
 from app.config import Config
 from app.extensions import cors, db, jwt, limiter, migrate
 from app.utils.errores import ApiError, registrar_manejadores_de_error
@@ -26,6 +30,10 @@ def create_app(configuracion=None) -> Flask:
     app.register_blueprint(health_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(cuenta_bp)
+    app.register_blueprint(catalogo_bp)
+    app.register_blueprint(carrito_bp)
+    app.register_blueprint(checkout_bp)
+    app.register_blueprint(mis_pedidos_bp)
     app.register_blueprint(admin_bp)
     _registrar_cabeceras_de_seguridad(app)
 

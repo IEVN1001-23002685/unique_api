@@ -1,8 +1,9 @@
 # Contrato HTTP
 
-Prefijo global: `/api/v1`. Estado: Fase 0 (infraestructura) y Fase 1 (modelo de datos,
-semillas, autenticación y administración) implementadas. Los módulos M02–M22 restantes
-se documentarán al implementarse.
+Prefijo global: `/api/v1`. Estado: Fases 0, 1 y 2 implementadas y verificadas. La Fase 2
+cubre cuenta, direcciones, medios de pago, cobertura de envío, catálogo, carrito, checkout
+simulado y pedidos del cliente (M02–M06). Los módulos M07–M21 y el resto de M22 se
+documentarán al implementarse.
 
 ## Endpoints implementados
 
@@ -55,13 +56,96 @@ Errores habituales: `400 VALIDACION`, `401 CREDENCIALES_INVALIDAS`/`SESION_INVAL
 - Refresh token: 7 días en cookie `httpOnly`, `SameSite=Strict`, `Secure` en producción.
 - La misma clave de refresco solo sirve una vez; al usarla se emite una nueva y la anterior queda revocada.
 
-## M02 — Cuenta (parcial)
+## M02 — Cuenta y envío
 
-| Método | Ruta | Rol | Respuesta |
-|---|---|---|---|
-| `GET` | `/cuenta` | autenticado | Perfil del usuario autenticado |
-| `PATCH` | `/cuenta` | autenticado | `nombre`, `apellidos`, `telefono`, `acepta_promociones` |
-| `PATCH` | `/cuenta/contrasena` | autenticado | `contrasena_actual`, `contrasena_nueva`; revoca refresh tokens |
+| Método | Ruta | Rol | Cuerpo / parámetros | Respuesta |
+|---|---|---|---|---|
+| `GET` | `/cuenta` | autenticado | — | Perfil del usuario autenticado (`200`) |
+| `PATCH` | `/cuenta` | autenticado | `nombre`, `apellidos`, `telefono`, `acepta_promociones` | Perfil actualizado (`200`) |
+| `PATCH` | `/cuenta/contrasena` | autenticado | `contrasena_actual`, `contrasena_nueva` | `200`; revoca refresh tokens |
+| `GET` | `/cuenta/direcciones` | C | — | Lista de direcciones activas propias (`200`) |
+| `POST` | `/cuenta/direcciones` | C | `tipo`, `alias`, `destinatario`, `telefono`, `calle`, `numero_ext`, `colonia`, `municipio`, `estado`, `codigo_postal`, opcionales `numero_int`, `referencia`, `rfc`, `razon_social`, `predeterminada` | `201` |
+| `PATCH` | `/cuenta/direcciones/{id}` | C | Campos parciales de dirección | `200` |
+| `DELETE` | `/cuenta/direcciones/{id}` | C | — | `204`; borrado lógico (`activa=false`) |
+| `GET` | `/cuenta/medios-pago` | C | — | Medios de pago activos propios (`200`) |
+| `POST` | `/cuenta/medios-pago` | C | `tipo` (`TARJETA`/`CUENTA`), `alias`, `titular`; tarjeta: `numero_tarjeta`, `vence_mes`, `vence_anio`, `cvv`; cuenta: `saldo_inicial` opcional | `201`; solo se guardan `ultimos4`, marca y vigencia |
+| `PATCH` | `/cuenta/medios-pago/{id}` | C | `alias` | `200` |
+| `DELETE` | `/cuenta/medios-pago/{id}` | C | — | `204`; borrado lógico |
+| `GET` | `/envio/cobertura?cp=` | P | `cp` de 5 dígitos | `200` con `cobertura`, `tarifa`, `costo` y `dias_estimados` |
+
+Errores: `400 VALIDACION`, `400 CODIGO_POSTAL_INVALIDO`, `401 NO_AUTENTICADO`,
+`403 PERMISO_INSUFICIENTE`, `404 DIRECCION_NO_ENCONTRADA`/`MEDIO_PAGO_NO_ENCONTRADO`,
+`422 DATOS_FACTURACION_INCOMPLETOS`, `422 TARJETA_INVALIDA`/`TARJETA_VENCIDA`/`CVV_INVALIDO`.
+
+Una sola dirección predeterminada por `tipo` por usuario. Las consultas siempre filtran por
+el usuario autenticado; un `usuario_id` enviado por el navegador se ignora.
+
+## M03 — Catálogo
+
+| Método | Ruta | Rol | Parámetros | Respuesta |
+|---|---|---|---|---|
+| `GET` | `/catalogo` | P | `categoria`, `color`, `talla`, `q`, `disponibles` | Lista de productos activos con variantes (`200`) |
+| `GET` | `/catalogo/{producto_id}` | P | — | Detalle con composición, guía, imágenes y variantes (`200`) |
+
+Cada variante expone `disponibilidad` (`Disponible`, `Pocas unidades`, `Bajo pedido`,
+`Agotado`), `bajo_pedido`, `fecha_estimada` y `comprable`. Nunca se exponen existencias
+exactas ni reservas. El catálogo no incluye costos, precios de compra ni márgenes.
+
+## M04 — Carrito
+
+| Método | Ruta | Rol | Cuerpo | Respuesta |
+|---|---|---|---|---|
+| `GET` | `/carrito` | C | — | Carrito revalidado con disponibilidad por línea (`200`) |
+| `PUT` | `/carrito/lineas` | C | `variante_id`, `cantidad` | Carrito actualizado (`200`) |
+| `DELETE` | `/carrito/lineas/{variante_id}` | C | — | `204` |
+| `POST` | `/carrito/fusionar` | C | `lineas: [{variante_id, cantidad}]` | Carrito fusionado (`200`) |
+
+Existe un carrito `ABIERTO` por usuario. `cantidad` no puede superar
+`max_piezas_por_linea` (configurable, propuesto 10). Las líneas se revalidan contra
+variantes activas y existencia; una línea no comprable se marca `comprable=false`.
+
+## M05 — Checkout
+
+| Método | Ruta | Rol | Cuerpo | Respuesta |
+|---|---|---|---|---|
+| `POST` | `/checkout/cotizar` | C | `codigo_postal` o `direccion_id`, `descuento_codigo`, opcional facturación | Subtotal, descuento, envío, total, fecha promesa y líneas (`200`) |
+| `POST` | `/checkout/descuento` | C | `codigo` | Descuento aplicable y ahorro (`200`) |
+| `POST` | `/checkout/pagar` | C | `direccion_id` o `direccion`, `metodo_pago`, medio guardado o datos de tarjeta, opcional `descuento_codigo` y facturación | `201` con venta, pedido y resumen |
+
+`/checkout/pagar` exige la cabecera `Idempotency-Key`. La misma clave con el mismo cuerpo
+devuelve la respuesta original; con otro cuerpo responde `409 IDEMPOTENCIA_CONFLICTO`.
+El total se recalcula en servidor como `subtotal - descuento + costo_envio`, con IVA
+incluido en los precios. El pago simulado valida Luhn y vigencia; la terminación `0000`
+rechaza. Nunca se guarda el número completo de tarjeta ni el CVV.
+
+Flujo atómico: bloqueo de `stock_variante` por ID ascendente → validación de CP y descuento
+→ pago → venta, líneas y direcciones históricas → pedido y líneas → reserva
+`min(disponible, cantidad)` con movimiento `RESERVA` → orden de producción para el faltante
+→ estado `CONFIRMADO` o `EN_PRODUCCION` → preparación `POR_SURTIR` si todo fue reservado →
+eventos, conversión del carrito y alertas. Un pago rechazado revierte todo y conserva el carrito.
+El resumen incluye `iva_importe` informativo, calculado como `total * iva_pct / (100 + iva_pct)`
+con `iva_pct` de configuración; no modifica los importes contables.
+
+Errores: `400 IDEMPOTENCIA_REQUERIDA`, `409 IDEMPOTENCIA_CONFLICTO`, `409 STOCK_NO_DISPONIBLE`,
+`422 CARRITO_VACIO`, `422 CARRITO_NO_PAGABLE`, `422 SIN_COBERTURA`, `422 PAGO_RECHAZADO`,
+`422 DESCUENTO_NO_APLICABLE`, `422 RECETA_NO_DISPONIBLE`.
+
+## M06 — Mis pedidos
+
+| Método | Ruta | Rol | Parámetros / cuerpo | Respuesta |
+|---|---|---|---|---|
+| `GET` | `/mis-pedidos` | C | `estado` (`TODOS`, `EN_PROCESO`, `ENVIADOS`, `ENTREGADOS`), `pagina`, `por_pagina` | Lista paginada propia (`200`) |
+| `GET` | `/mis-pedidos/{id}` | C | — | Detalle propio con artículos, eventos visibles, guía y repartidor (`200`) |
+| `POST` | `/mis-pedidos/{id}/cancelar` | C | `motivo` | Pedido cancelado (`200`) |
+| `GET` | `/mis-pedidos/{id}/comprobante` | C | — | Comprobante histórico (`200`) |
+
+La cancelación del cliente es válida en `RECIBIDO`, `CONFIRMADO` o `EN_PRODUCCION`: libera
+reservas con `LIBERA_RESERVA`, ajusta la orden de producción abierta, elimina la preparación
+y registra un reembolso simulado. El `CHECK` de `pedido_linea` exige que
+`cant_reservada + cant_pendiente = cantidad`; por eso al cancelar se deja `cantidad = 0` junto
+con ambas cantidades en cero. El histórico de la venta conserva la cantidad original.
+Cualquier pedido ajeno responde `404`, nunca `403`, para no revelar existencia de recursos de
+otros clientes.
 
 ## M22 — Administración (parcial)
 
@@ -93,6 +177,6 @@ Errores habituales: `400 VALIDACION`, `401 CREDENCIALES_INVALIDAS`/`SESION_INVAL
 
 ## Pendiente
 
-Los blueprints M03–M21 y el resto de M02/M22 se documentarán aquí a medida que se
-implementen. La tabla completa de rutas requeridas está en la sección 11 del documento
-integral y en `AGENTS.md`.
+Los blueprints M07–M21 y el resto de M22 se documentarán aquí a medida que se implementen.
+La tabla completa de rutas requeridas está en la sección 11 del documento integral y en
+`AGENTS.md`.
