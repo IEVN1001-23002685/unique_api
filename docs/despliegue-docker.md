@@ -27,6 +27,7 @@ Comprobaciones:
 ```bash
 docker compose exec api python scripts/wait_for_db.py
 docker compose exec api flask db upgrade
+docker compose exec api python -m scripts.seed
 docker compose exec api python -m pytest -q
 curl.exe -i http://localhost:8001/api/v1/health
 curl.exe -i http://localhost:8001/api/v1/health/db
@@ -56,6 +57,13 @@ Ambos son volúmenes nombrados. `docker compose down` los conserva. Nunca usar
 Las variables mínimas están en `.env.example`. `SECRET_KEY`, `JWT_SECRET_KEY`,
 `MYSQL_PASSWORD` y `MYSQL_ROOT_PASSWORD` deben cambiarse antes de desplegar. La API usa
 `MYSQL_USER`, nunca `root`. `DEBUG` se fuerza a `false` en producción.
+
+Las cuentas iniciales se crean con `ADMIN_EMAIL`/`ADMIN_PASSWORD` y
+`OPERATIVO_EMAIL`/`OPERATIVO_PASSWORD`; también pueden crearse con
+`python -m scripts.create_admin admin|operativo`. No existen contraseñas fijas.
+
+`WEB_CONCURRENCY=1` mantiene el contador de Flask-Limiter en un solo proceso. Si se aumenta,
+defina `RATELIMIT_STORAGE_URI` con un almacén compartido; véase `decisiones-tecnicas.md`.
 
 Puertos configurables: `API_HOST_PORT`, `MYSQL_HOST_PORT` y `PHPMYADMIN_PORT`.
 En este entorno se usan **8001, 3307 y 8081** porque 8000, 3306 y 8080 están ocupados

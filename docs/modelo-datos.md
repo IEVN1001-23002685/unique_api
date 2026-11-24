@@ -1,8 +1,8 @@
 # Modelo de datos
 
 Fuente: sección 6 del documento integral. El modelo declara **64 tablas en 11 grupos**.
-En la Fase 0 no se ha creado ninguna tabla: este archivo es el índice que guiará las
-migraciones de la Fase 1.
+En la Fase 1 se crearon las 64 tablas funcionales más `idempotencia_operacion`, con un total
+de 65 tablas base. La verificación en MySQL confirma el número, el motor InnoDB y las vistas.
 
 | Grupo | Tablas | Cantidad |
 |---|---|---:|
@@ -32,17 +32,28 @@ migraciones de la Fase 1.
 ## Tabla de infraestructura adicional
 
 `AGENTS.md` exige almacenamiento persistente de `Idempotency-Key`. El documento no la incluye
-entre las 64 tablas, por lo que se añadirá una tabla de infraestructura (por ejemplo
-`idempotencia_operacion`) separada del modelo de negocio. Véase `decisiones-tecnicas.md`.
+entre las 64 tablas, por lo que se añadió `idempotencia_operacion` como tabla de infraestructura,
+separada del modelo de negocio. Véase `decisiones-tecnicas.md`.
 
 ## Vistas
 
-El documento define `v_disponibilidad_variante` y enumera `v_inventario_material`,
-`v_ventas_sku`, `v_merma_resumen`, `v_capacidad_variante` y `v_pedidos_estancadas`, entre
-otras. Todas se crearán en migraciones reproducibles durante la Fase 1.
+Creadas en la migración `7c1f9d2a4b60_vistas_de_lectura.py`:
+
+- `v_disponibilidad_variante`: existencia, reservado, disponible y semáforo por variante.
+- `v_inventario_material`: físico, reservado, en compra, disponible, posición, consumo diario
+  de 30 días o manual y punto de reorden por material y color.
+- `v_capacidad_variante`: número máximo de prendas alcanzables según la receta vigente.
+- `v_ventas_sku`: unidades e ingresos por fecha, SKU, categoría, talla y color.
+- `v_merma_resumen`: merma por fecha, etapa, causa, producto y material con costo perdido.
+- `v_pedidos_estancados`: pedidos que superan el umbral de su estado en `configuracion`.
 
 ## Migraciones
 
 El entorno Alembic ya existe en `migrations/`. No se usa `db.create_all()` en producción.
+Revisiones aplicadas:
+
+1. `3baed16b1d4b` — `Fase 1 modelo de datos` (65 tablas, restricciones, índices y claves foráneas).
+2. `7c1f9d2a4b60` — `Vistas de lectura del documento funcional`.
+
 Elaboración: `docker compose exec api flask db migrate -m "descripcion"`;
 aplicación: `docker compose exec api flask db upgrade`.
