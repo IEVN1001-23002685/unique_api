@@ -28,12 +28,12 @@ Comprobaciones:
 docker compose exec api python scripts/wait_for_db.py
 docker compose exec api flask db upgrade
 docker compose exec api python -m pytest -q
-curl -i http://localhost:8000/api/v1/health
-curl -i http://localhost:8000/api/v1/health/db
+curl.exe -i http://localhost:8001/api/v1/health
+curl.exe -i http://localhost:8001/api/v1/health/db
 ```
 
-phpMyAdmin: `http://localhost:8080`. El servidor se llama `mysql` y las credenciales son
-`MYSQL_USER` / `MYSQL_PASSWORD` de `.env`.
+phpMyAdmin: `http://localhost:8081` (valor configurado en este entorno; `PHPMYADMIN_PORT`).
+El servidor se llama `mysql` y las credenciales son `MYSQL_USER` / `MYSQL_PASSWORD` de `.env`.
 
 ## Imágenes y versiones
 
@@ -57,8 +57,15 @@ Las variables mínimas están en `.env.example`. `SECRET_KEY`, `JWT_SECRET_KEY`,
 `MYSQL_PASSWORD` y `MYSQL_ROOT_PASSWORD` deben cambiarse antes de desplegar. La API usa
 `MYSQL_USER`, nunca `root`. `DEBUG` se fuerza a `false` en producción.
 
-Puertos configurables: `API_HOST_PORT` (8000), `MYSQL_HOST_PORT` (3306),
-`PHPMYADMIN_PORT` (8080). `MYSQL_HOST_PORT` puede cambiarse si hay conflicto local.
+Puertos configurables: `API_HOST_PORT`, `MYSQL_HOST_PORT` y `PHPMYADMIN_PORT`.
+En este entorno se usan **8001, 3307 y 8081** porque 8000, 3306 y 8080 están ocupados
+por contenedores de otro proyecto (`hospital_dr`, `mysql_db` y `phpmyadmin`).
+Los puertos internos no cambian: API 8000, MySQL 3306 y phpMyAdmin 80.
+Para detectar conflictos en Windows:
+
+```powershell
+Get-NetTCPConnection -LocalPort 8001,3307,8081 -ErrorAction SilentlyContinue
+```
 
 ## Reconstrucción y diagnóstico
 
@@ -70,6 +77,18 @@ docker compose ps
 docker compose logs mysql
 docker compose logs api
 ```
+
+El código se copia dentro de la imagen (no hay bind mount), por lo que **cualquier cambio
+en `app/`, `scripts/` o `migrations/` requiere `docker compose build`** antes de
+`docker compose up -d`.
+
+Si `api` no logra conectar con MySQL, ejecutar:
+
+```bash
+docker compose exec api python scripts/diagnose_db.py
+```
+
+El comando muestra la URL con la contraseña oculta y el error real sin secretos.
 
 El `healthcheck` de `mysql` usa `mysqladmin ping` con `MYSQL_ROOT_PASSWORD` de forma
 interna. El de `api` consulta `/api/v1/health`. `depends_on` con condición

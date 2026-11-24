@@ -1,12 +1,20 @@
 """Espera acotada a que MySQL acepte conexiones antes de iniciar Gunicorn."""
 
 import os
+import re
 import sys
 import time
 from urllib.parse import urlparse
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
+
+
+def ocultar_secretos(mensaje: str) -> str:
+    secreto = os.getenv("MYSQL_PASSWORD", "")
+    if secreto:
+        mensaje = mensaje.replace(secreto, "***")
+    return re.sub(r"(?i)password=[^&\s]+", "password=***", mensaje)
 
 
 def esperar_base_de_datos() -> int:
@@ -32,8 +40,11 @@ def esperar_base_de_datos() -> int:
         except Exception as error:
             motor.dispose()
             restante = limite - time.monotonic()
+            detalle = ocultar_secretos(str(error))
+            if intento == 1:
+                print(f"Primer fallo: {type(error).__name__}: {detalle}", flush=True)
             if restante <= 0:
-                print(f"MySQL no disponible en {ubicacion}: {type(error).__name__}", file=sys.stderr)
+                print(f"MySQL no disponible en {ubicacion}: {type(error).__name__}: {detalle}", file=sys.stderr)
                 return 1
             espera = min(2 ** min(intento - 1, 2), restante, 3.0)
             print(f"Esperando MySQL en {ubicacion} ({espera:.1f}s, intento {intento})", flush=True)

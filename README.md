@@ -34,17 +34,17 @@ Servicios:
 
 | Servicio | Imagen | Puerto host | Uso |
 |---|---|---:|---|
-| `api` | `python:3.11-slim` (propia) | 8000 | Flask + Gunicorn |
-| `mysql` | `mysql:8.4.3` | 3306 | Persistencia |
-| `phpmyadmin` | `phpmyadmin:5.2.3` | 8080 | Administración de MySQL |
+| `api` | `python:3.11-slim` (propia) | 8001 (`API_HOST_PORT`; interno 8000) | Flask + Gunicorn |
+| `mysql` | `mysql:8.4.3` | 3307 (`MYSQL_HOST_PORT`; interno 3306) | Persistencia |
+| `phpmyadmin` | `phpmyadmin:5.2.3` | 8081 (`PHPMYADMIN_PORT`; interno 80) | Administración de MySQL |
 
 phpMyAdmin se conecta a MySQL por el nombre de servicio `mysql`, no por `localhost`.
 
 ## Health check
 
 ```bash
-curl -i http://localhost:8000/api/v1/health
-curl -i http://localhost:8000/api/v1/health/db
+curl.exe -i http://localhost:8001/api/v1/health
+curl.exe -i http://localhost:8001/api/v1/health/db
 ```
 
 - `/api/v1/health`: liveness, no consulta la base de datos.
@@ -60,6 +60,9 @@ docker compose exec api python scripts/wait_for_db.py
 docker compose exec api flask db upgrade
 docker compose exec api python -m pytest -q
 ```
+
+Si la API no conecta con MySQL: `docker compose exec api python scripts/diagnose_db.py`.
+Cualquier cambio en código requiere `docker compose build` antes de `up -d`.
 
 `flask db upgrade` no crea tablas porque en esta fase aún no hay revisiones. Las semillas
 (`scripts/seed.py`) y el administrador inicial (`scripts/create_admin.py`) se crean en la Fase 1.
@@ -81,6 +84,9 @@ Los datos de MySQL y los archivos subidos viven en volúmenes nombrados y sobrev
 - `api` en estado `unhealthy`: revise `docker compose logs api` y compruebe `DATABASE_URL`.
 - `mysql` en estado `unhealthy`: revise `docker compose logs mysql`; el healthcheck usa
   `MYSQL_ROOT_PASSWORD` solo internamente.
+- `Bind for 0.0.0.0:<puerto> failed: port is already allocated`: otro proceso del host ocupa
+  el puerto publicado. Cambie `MYSQL_HOST_PORT`, `PHPMYADMIN_PORT` o `API_HOST_PORT` en `.env`
+  y vuelva a ejecutar `docker compose up -d`. Los puertos internos no se modifican.
 - Error de CORS: `CORS_ORIGINS` debe contener el origen Angular exacto, separado por comas si
   hay varios.
 
