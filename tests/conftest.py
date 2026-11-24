@@ -376,3 +376,81 @@ def tienda(app, mysql_disponible):
                 db.bindparam("ids", usuarios, expanding=True)
             ))
         db.session.commit()
+
+
+@pytest.fixture
+def limpieza_fase3(app, mysql_disponible):
+    """Registra limpieza SQL en orden inverso para datos aislados de Fase 3."""
+    tareas = []
+
+    def registrar(sql, parametros=None):
+        tareas.append((sql, parametros or {}))
+
+    yield registrar
+
+    with app.app_context():
+        for sql, parametros in reversed(tareas):
+            db.session.execute(text(sql), parametros)
+        db.session.commit()
+
+
+@pytest.fixture
+def datos_fase3(app, limpieza_fase3):
+    """Datos base de catálogo y materiales para pruebas de M10-M15."""
+    from app.models import (
+        CausaMerma,
+        CategoriaProducto,
+        Color,
+        InventarioMaterial,
+        Material,
+        Proveedor,
+        Talla,
+    )
+
+    with app.app_context():
+        categoria = db.session.query(CategoriaProducto).filter_by(prefijo_sku="PL").one()
+        tallas = {
+            fila.codigo: fila.id
+            for fila in db.session.query(Talla).filter(Talla.codigo.in_(["CH", "MD", "GD"])).all()
+        }
+        colores = {
+            fila.codigo: fila.id
+            for fila in db.session.query(Color).filter(Color.codigo.in_(["BL", "NG", "GR"])).all()
+        }
+        material = db.session.query(Material).filter_by(codigo="TEL-FEL").one()
+        inventario = db.session.query(InventarioMaterial).filter_by(
+            material_id=material.id, color_id=colores["BL"]
+        ).one()
+        causa_rechazo = db.session.query(CausaMerma).filter_by(
+            nombre="Rechazo en recepción"
+        ).one()
+
+    def crear_proveedor():
+        sufijo = secrets.token_hex(4).upper()
+        with app.app_context():
+            proveedor = Proveedor(
+                razon_social=f"Proveedor {sufijo}",
+                nombre_comercial=f"Proveedor {sufijo}",
+                rfc="AAA010101AAA",
+                contacto="Contacto",
+                telefono="1234567890",
+                correo=f"proveedor-{sufijo.lower()}@example.com",
+                direccion="Dirección de prueba",
+                condiciones_pago="Contado",
+            )
+            db.session.add(proveedor)
+            db.session.commit()
+            proveedor_id = proveedor.id
+        limpieza_fase3("DELETE FROM proveedor WHERE id = :id", {"id": proveedor_id})
+        return proveedor_id
+
+    return {
+        "categoria_id": categoria.id,
+        "tallas": tallas,
+        "colores": colores,
+        "material_id": material.id,
+        "inventario_material_id": inventario.id,
+        "causa_rechazo_id": causa_rechazo.id,
+        "crear_proveedor": crear_proveedor,
+        "limpiar": limpieza_fase3,
+    }
