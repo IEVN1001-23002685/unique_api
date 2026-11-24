@@ -2,10 +2,13 @@
 
 from flask import Flask
 
+from app.blueprints.admin import admin_bp
+from app.blueprints.auth import auth_bp
+from app.blueprints.cuenta import cuenta_bp
 from app.blueprints.health import health_bp
 from app.config import Config
 from app.extensions import cors, db, jwt, limiter, migrate
-from app.utils.errores import registrar_manejadores_de_error
+from app.utils.errores import ApiError, registrar_manejadores_de_error
 
 
 def create_app(configuracion=None) -> Flask:
@@ -19,10 +22,28 @@ def create_app(configuracion=None) -> Flask:
     limiter.init_app(app)
 
     registrar_manejadores_de_error(app)
+    _registrar_errores_jwt(jwt)
     app.register_blueprint(health_bp)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(cuenta_bp)
+    app.register_blueprint(admin_bp)
     _registrar_cabeceras_de_seguridad(app)
 
     return app
+
+
+def _registrar_errores_jwt(manager) -> None:
+    @jwt.unauthorized_loader
+    def _sin_token(_motivo):
+        return ApiError("NO_AUTENTICADO", "Se requiere una sesión válida", 401).respuesta()
+
+    @jwt.invalid_token_loader
+    def _token_invalido(_motivo):
+        return ApiError("SESION_INVALIDA", "Sesión inválida", 401).respuesta()
+
+    @jwt.expired_token_loader
+    def _token_expirado(_cabecera, _datos):
+        return ApiError("SESION_EXPIRADA", "La sesión ha expirado", 401).respuesta()
 
 
 def _registrar_cabeceras_de_seguridad(app: Flask) -> None:

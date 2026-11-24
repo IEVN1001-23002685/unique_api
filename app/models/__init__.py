@@ -1,0 +1,143 @@
+"""Modelos de persistencia de UNIQUE (64 tablas del documento + idempotencia)."""
+
+from app.models.alertas import Alerta
+from app.models.base import ModeloBase, OPCIONES_MYSQL, ahora_utc, tabla_args
+from app.models.catalogos import (
+    CategoriaMaterial,
+    CategoriaProducto,
+    CausaMerma,
+    Color,
+    TarifaEnvio,
+    Talla,
+)
+from app.models.cliente import Direccion, MedioPago
+from app.models.compras import (
+    Cotizacion,
+    CotizacionLinea,
+    OrdenCompra,
+    OrdenCompraLinea,
+    Proveedor,
+    ProveedorMaterial,
+    Recepcion,
+    RecepcionLinea,
+    Requisicion,
+    RequisicionLinea,
+)
+from app.models.idempotencia import IdempotenciaOperacion
+from app.models.logistica import (
+    Devolucion,
+    DevolucionEvidencia,
+    DevolucionLinea,
+    EmpaqueRegla,
+    Entrega,
+    Preparacion,
+    PreparacionLinea,
+    Repartidor,
+)
+from app.models.merma import Merma
+from app.models.materiales import InventarioMaterial, LoteMaterial, Material, MovimientoMaterial
+from app.models.pedidos import Pedido, PedidoEvento, PedidoLinea
+from app.models.produccion import (
+    OrdenMaterial,
+    OrdenProduccion,
+    OrdenProduccionLinea,
+    ProduccionPedido,
+    RevisionCalidad,
+)
+from app.models.producto import (
+    DisenoBordado,
+    DisenoBordadoHilo,
+    MovimientoProducto,
+    Producto,
+    ProductoImagen,
+    StockVariante,
+    VarianteProducto,
+)
+from app.models.recetas import Receta, RecetaBordado, RecetaLinea
+from app.models.seguridad import (
+    Bitacora,
+    Configuracion,
+    RecuperacionContrasena,
+    Rol,
+    SecuenciaFolio,
+    TokenRefresco,
+    Usuario,
+)
+from app.models.ventas import (
+    Carrito,
+    CarritoLinea,
+    Descuento,
+    Pago,
+    Venta,
+    VentaDireccion,
+    VentaLinea,
+)
+
+__all__ = [
+    "Alerta",
+    "Bitacora",
+    "Carrito",
+    "CarritoLinea",
+    "CategoriaMaterial",
+    "CategoriaProducto",
+    "CausaMerma",
+    "Color",
+    "Configuracion",
+    "Cotizacion",
+    "CotizacionLinea",
+    "Descuento",
+    "Direccion",
+    "DisenoBordado",
+    "DisenoBordadoHilo",
+    "EmpaqueRegla",
+    "Entrega",
+    "IdempotenciaOperacion",
+    "InventarioMaterial",
+    "LoteMaterial",
+    "Material",
+    "MedioPago",
+    "ModeloBase",
+    "Merma",
+    "MovimientoMaterial",
+    "MovimientoProducto",
+    "OPCIONES_MYSQL",
+    "OrdenCompra",
+    "OrdenCompraLinea",
+    "OrdenMaterial",
+    "OrdenProduccion",
+    "OrdenProduccionLinea",
+    "Pago",
+    "Pedido",
+    "PedidoEvento",
+    "PedidoLinea",
+    "Preparacion",
+    "PreparacionLinea",
+    "ProduccionPedido",
+    "Producto",
+    "ProductoImagen",
+    "Proveedor",
+    "ProveedorMaterial",
+    "Recepcion",
+    "RecepcionLinea",
+    "Receta",
+    "RecetaBordado",
+    "RecetaLinea",
+    "RecuperacionContrasena",
+    "Repartidor",
+    "Requisicion",
+    "RequisicionLinea",
+    "RevisionCalidad",
+    "Rol",
+    "SecuenciaFolio",
+    "StockVariante",
+    "Talla",
+    "TarifaEnvio",
+    "TokenRefresco",
+    "Usuario",
+    "VarianteProducto",
+    "Venta",
+    "VentaDireccion",
+    "VentaLinea",
+    "ahora_utc",
+    "tabla_args",
+]
