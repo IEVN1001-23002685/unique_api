@@ -2,9 +2,9 @@
 
 Backend REST de UNIQUE (Flask + MySQL), construido según `UNIQUE_documento_integral_v3.txt`.
 
-**Estado actual: Fase 0 (infraestructura).** No hay modelos de negocio, migraciones de tablas ni
-endpoints funcionales todavía. No se avanzará a los módulos M01–M22 hasta verificar los tres
-servicios Docker, la salud de MySQL y la conexión desde Flask.
+**Estado actual: Fase 1 en verificación.** La Fase 0 (infraestructura) quedó verificada. La Fase 1
+ya creó el modelo completo, migraciones, vistas, semillas, autenticación JWT y administración
+básica; se ejecutarán las pruebas antes de declararla terminada.
 
 ## Requisitos
 
@@ -64,8 +64,23 @@ docker compose exec api python -m pytest -q
 Si la API no conecta con MySQL: `docker compose exec api python scripts/diagnose_db.py`.
 Cualquier cambio en código requiere `docker compose build` antes de `up -d`.
 
-`flask db upgrade` no crea tablas porque en esta fase aún no hay revisiones. Las semillas
-(`scripts/seed.py`) y el administrador inicial (`scripts/create_admin.py`) se crean en la Fase 1.
+`flask db upgrade` aplica las revisiones de Fase 1 (modelo completo y vistas). Después ejecute
+las semillas, que son idempotentes:
+
+```bash
+docker compose exec api python -m scripts.seed
+docker compose exec api python -m scripts.seed   # segunda ejecución: 0 inserciones
+```
+
+Las cuentas iniciales se crean solo si configura `ADMIN_EMAIL`/`ADMIN_PASSWORD` y
+`OPERATIVO_EMAIL`/`OPERATIVO_PASSWORD` en `.env`; también puede crearlas de forma interactiva:
+
+```bash
+docker compose exec api python -m scripts.create_admin admin
+docker compose exec api python -m scripts.create_admin operativo
+```
+
+No hay contraseñas fijas en el código ni en las semillas.
 
 ## Detener y reiniciar
 
