@@ -44,7 +44,7 @@ def evaluar_proveedores():
 @proveedores_bp.get("/proveedores")
 @roles_requeridos("ADMIN")
 def listar_proveedores():
-    filtros = ProveedorFiltrosSchema().load(request.args)
+    filtros = _filtros(ProveedorFiltrosSchema())
     pagina, por_pagina = parametros_paginacion()
     filtros.update(pagina=pagina, por_pagina=por_pagina)
     resultado = proveedor_service.listar(filtros)
