@@ -2,11 +2,13 @@
 
 Backend REST de UNIQUE (Flask + MySQL), construido según `UNIQUE_documento_integral_v3.txt`.
 
-**Estado actual: Fase 4 verificada.** La Fase 0 (infraestructura), la Fase 1 (modelo completo,
+**Estado actual: Fase 6 verificada.** La Fase 0 (infraestructura), la Fase 1 (modelo completo,
 migraciones, vistas, semillas, autenticación JWT y administración básica), la Fase 2 (cuenta,
 catálogo, carrito, checkout simulado y pedidos del cliente), la Fase 3 (productos, recetas,
-proveedores, compras y materia prima) y la Fase 4 (producción y mermas) están implementadas y
-probadas contra MySQL. Las fases restantes se implementarán de forma incremental.
+proveedores, compras y materia prima), la Fase 4 (producción y mermas), la Fase 5 (ventas,
+pedidos administrativos y devoluciones) y la Fase 6 (preparación, entregas, dashboard, alertas,
+catálogos administrativos y tareas programadas) están implementadas y probadas contra MySQL.
+La Fase 7 (cierre y revisión final) queda pendiente.
 
 ## Requisitos
 
@@ -36,7 +38,7 @@ Servicios:
 
 | Servicio | Imagen | Puerto host | Uso |
 |---|---|---:|---|
-| `api` | `python:3.11-slim` (propia) | 8001 (`API_HOST_PORT`; interno 8000) | Flask + Gunicorn |
+| `api` | `python:3.11-slim` (propia) | 8001 (`API_HOST_PORT`; interno 8000) | Supervisor: Gunicorn + scheduler |
 | `mysql` | `mysql:8.4.3` | 3307 (`MYSQL_HOST_PORT`; interno 3306) | Persistencia |
 | `phpmyadmin` | `phpmyadmin:5.2.3` | 8081 (`PHPMYADMIN_PORT`; interno 80) | Administración de MySQL |
 
@@ -52,8 +54,10 @@ curl.exe -i http://localhost:8001/api/v1/health/db
 - `/api/v1/health`: liveness, no consulta la base de datos.
 - `/api/v1/health/db`: readiness, ejecuta `SELECT 1`; responde `503` si MySQL falla.
 
-El contenedor `api` espera a MySQL con `scripts/wait_for_db.py` antes de iniciar Gunicorn.
-El `healthcheck` de Compose usa `/api/v1/health`.
+El contenedor `api` espera a MySQL con `scripts/wait_for_db.py` antes de iniciar Supervisor.
+Supervisor levanta dos procesos: `api` (Gunicorn, sin `--reload`) y `scheduler`
+(`python -m app.jobs`, con `GET_LOCK('unique_scheduler', 5)` en MySQL para no duplicar tareas
+entre réplicas). El `healthcheck` de Compose usa `/api/v1/health`.
 
 ## Migraciones, semillas y pruebas
 
@@ -67,7 +71,7 @@ Si la API no conecta con MySQL: `docker compose exec api python scripts/diagnose
 Cualquier cambio en código requiere `docker compose build` antes de `up -d`.
 
 `flask db upgrade` aplica tres revisiones: Fase 1 (modelo completo, vistas e índices), vistas de
-lectura y `b2c3d4e5f6a7` (reversos de merma y neteo de `v_merma_resumen`). Las Fases 2, 3 y 4 no
+lectura y `b2c3d4e5f6a7` (reversos de merma y neteo de `v_merma_resumen`). Las Fases 2 a 6 no
 añadieron tablas funcionales: reutilizan el modelo y la tabla de infraestructura
 `idempotencia_operacion` (alcances `checkout:pagar`, `recepciones:registrar` y
 `produccion:iniciar`). Después ejecute las semillas, que son idempotentes:
@@ -93,9 +97,15 @@ recetas, receta `VIGENTE` no editable, ajustes con movimientos inmutables, PEPS,
 idempotentes con merma por rechazo, permisos Admin/Operativo y ocultamiento de costos. La Fase 4
 añade `tests/integration/test_fase4_produccion_mermas.py`: ciclo completo de orden de producción,
 reserva y semáforo, solicitud de compra, inicio idempotente con PEPS, rollback con material
-insuficiente, dictamen con asignación FIFO a pedidos, reverso de mermas e indicadores,roles y
-transiciones inválidas. La suite completa verificada es `59 passed`. Las imágenes se guardan en
-el volumen de uploads, se validan con Pillow y se rechazan si superan 2 MB.
+insuficiente, dictamen con asignación FIFO a pedidos, reverso de mermas e indicadores, roles y
+transiciones inválidas. La Fase 5 añade `tests/integration/test_fase5_comercial.py`: venta manual
+con pago pendiente, reembolsos, descuentos, permisos, devolución con reingreso, cambio con venta
+de reemplazo y transiciones de pedidos. La Fase 6 añade `tests/integration/test_fase6_logistica.py`:
+cola de preparación con verificación y empaque PEPS, etiqueta y hoja de reparto en PDF, ciclo de
+entrega con reingreso, dos fallos con alerta crítica, KPIs y permisos de dashboard, alertas y sus
+reglas, catálogos con códigos inmutables, bitácora y las seis tareas programadas. La suite
+completa verificada es `75 passed`. Las imágenes se guardan en el volumen de uploads, se validan
+con Pillow y se rechazan si superan 2 MB.
 
 ## Detener y reiniciar
 

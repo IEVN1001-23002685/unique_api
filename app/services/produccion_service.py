@@ -365,20 +365,23 @@ def detalle(orden_id: int) -> dict:
     return respuesta
 
 
-def pendientes_produccion(filtros=None, pagina=1, por_pagina=20) -> dict:
-    filtros = filtros or {}
-    pendiente = (
+def _pendiente_linea():
+    return (
         OrdenProduccionLinea.cantidad_planeada
         - OrdenProduccionLinea.cantidad_aprobada
         - OrdenProduccionLinea.cantidad_merma
     )
+
+
+def pendientes_produccion(filtros=None, pagina=1, por_pagina=20) -> dict:
+    filtros = filtros or {}
     consulta = (
         select(OrdenProduccion)
         .distinct()
         .join(OrdenProduccionLinea, OrdenProduccionLinea.orden_id == OrdenProduccion.id)
         .where(
             OrdenProduccion.estado.in_(ESTADOS_ABIERTOS),
-            pendiente > 0,
+            _pendiente_linea() > 0,
         )
     )
     if filtros.get("semaforo"):
@@ -391,6 +394,70 @@ def pendientes_produccion(filtros=None, pagina=1, por_pagina=20) -> dict:
     ).scalars().all()
     return {
         "items": [_resumen(orden) for orden in ordenes],
+        "total": total,
+        "pagina": pagina,
+        "por_pagina": por_pagina,
+    }
+
+
+def pendientes_lineas(filtros=None, pagina=1, por_pagina=20) -> dict:
+    """Demanda pendiente agrupada por SKU; fuente única de M09 y M16."""
+    filtros = filtros or {}
+    consulta = (
+        select(
+            VarianteProducto.id,
+            VarianteProducto.sku,
+            OrdenProduccion.id,
+            OrdenProduccion.folio,
+            OrdenProduccion.fecha_requerida,
+            OrdenProduccion.semaforo,
+            func.sum(ProduccionPedido.cantidad).label("demanda"),
+        )
+        .join(
+            OrdenProduccionLinea,
+            OrdenProduccionLinea.id == ProduccionPedido.orden_linea_id,
+        )
+        .join(OrdenProduccion, OrdenProduccion.id == OrdenProduccionLinea.orden_id)
+        .join(VarianteProducto, VarianteProducto.id == OrdenProduccionLinea.variante_id)
+        .where(
+            OrdenProduccion.estado.in_(ESTADOS_ABIERTOS),
+            _pendiente_linea() > 0,
+        )
+        .group_by(
+            VarianteProducto.id,
+            VarianteProducto.sku,
+            OrdenProduccion.id,
+            OrdenProduccion.folio,
+            OrdenProduccion.fecha_requerida,
+            OrdenProduccion.semaforo,
+        )
+        .order_by(
+            OrdenProduccion.fecha_requerida.asc(),
+            OrdenProduccion.id,
+            VarianteProducto.id,
+        )
+    )
+    if filtros.get("semaforo"):
+        consulta = consulta.where(OrdenProduccion.semaforo == filtros["semaforo"])
+    if filtros.get("sku"):
+        consulta = consulta.where(VarianteProducto.sku.like(f"%{filtros['sku']}%"))
+    filas = db.session.execute(consulta).all()
+    items = [
+        {
+            "variante_id": variante_id,
+            "sku": sku,
+            "orden_id": orden_id,
+            "orden_folio": folio,
+            "demanda": int(demanda or 0),
+            "fecha_estimada": fecha.isoformat() if fecha else None,
+            "semaforo": semaforo,
+        }
+        for variante_id, sku, orden_id, folio, fecha, semaforo, demanda in filas
+    ]
+    total = len(items)
+    inicio = (pagina - 1) * por_pagina
+    return {
+        "items": items[inicio : inicio + por_pagina],
         "total": total,
         "pagina": pagina,
         "por_pagina": por_pagina,

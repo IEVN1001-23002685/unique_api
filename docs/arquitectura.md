@@ -2,8 +2,9 @@
 
 ## Contenedores
 
-- `api`: `python:3.11-slim`, usuario no root (`uid 10001`), Gunicorn sin `--reload`.
-  Contiene todo el runtime Python: aplicación, migraciones, tareas programadas y scripts.
+- `api`: `python:3.11-slim`, usuario no root (`uid 10001`), Supervisor con Gunicorn sin
+  `--reload` y un proceso `scheduler` único. Contiene todo el runtime Python: aplicación,
+  migraciones, tareas programadas y scripts.
 - `mysql`: `mysql:8.4.3`, volumen nombrado `mysql_data`.
 - `phpmyadmin`: `phpmyadmin:5.2.3`, conecta al servicio `mysql` por nombre de servicio.
 
@@ -29,8 +30,10 @@ Las rutas no contienen consultas complejas ni cálculos. El documento lo define 
 
 1. Compose espera a que `mysql` esté `healthy`.
 2. El contenedor `api` ejecuta `scripts/wait_for_db.py` con reintentos y backoff acotado.
-3. Se inicia Gunicorn enlazado a `APP_HOST:APP_PORT` con `WEB_CONCURRENCY` workers.
-4. `/api/v1/health` responde sin tocar MySQL; `/api/v1/health/db` usa `SELECT 1`.
+3. Se inicia Supervisor, que levanta Gunicorn enlazado a `APP_HOST:APP_PORT` con
+   `WEB_CONCURRENCY` workers y el proceso `scheduler` (`python -m app.jobs`).
+4. El scheduler toma `GET_LOCK('unique_scheduler', 5)` en MySQL antes de iniciar APScheduler.
+5. `/api/v1/health` responde sin tocar MySQL; `/api/v1/health/db` usa `SELECT 1`.
 
 ## Configuración
 

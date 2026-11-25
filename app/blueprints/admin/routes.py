@@ -1,22 +1,74 @@
-"""Endpoints administrativos de usuarios, clientes, bitácora y configuración (M22)."""
+"""Endpoints administrativos de usuarios, clientes, catálogos y bitácora (M22)."""
 
 from flask import Blueprint, jsonify, request
+from marshmallow import ValidationError
 from sqlalchemy import func, select
 
 from app.extensions import db
-from app.models import Bitacora, Rol, Usuario
+from app.models import Rol, Usuario
 from app.schemas import (
+    BitacoraFiltrosSchema,
     BitacoraSchema,
+    CatalogoAdminFiltrosSchema,
+    CausaMermaActualizarSchema,
+    CausaMermaCrearSchema,
     ConfiguracionSchema,
+    CategoriaMaterialActualizarSchema,
+    CategoriaMaterialCrearSchema,
+    CategoriaProductoActualizarSchema,
+    CategoriaProductoCrearSchema,
+    ColorActualizarSchema,
+    ColorCrearSchema,
+    TarifaEnvioActualizarSchema,
+    TarifaEnvioCrearSchema,
+    TallaActualizarSchema,
+    TallaCrearSchema,
     UsuarioActualizarSchema,
     UsuarioCrearSchema,
     UsuarioSchema,
 )
 from app.security import roles_requeridos, usuario_actual
-from app.services import configuracion_service, usuario_service
+from app.services import admin_service, configuracion_service, usuario_service
 from app.utils.errores import ApiError
 from app.utils.paginacion import parametros_paginacion
 from app.utils.validacion import cuerpo
+
+CREAR_CATALOGO = {
+    "color": ColorCrearSchema,
+    "talla": TallaCrearSchema,
+    "categoria-producto": CategoriaProductoCrearSchema,
+    "categoria-material": CategoriaMaterialCrearSchema,
+    "causa-merma": CausaMermaCrearSchema,
+    "tarifa-envio": TarifaEnvioCrearSchema,
+}
+ACTUALIZAR_CATALOGO = {
+    "color": ColorActualizarSchema,
+    "talla": TallaActualizarSchema,
+    "categoria-producto": CategoriaProductoActualizarSchema,
+    "categoria-material": CategoriaMaterialActualizarSchema,
+    "causa-merma": CausaMermaActualizarSchema,
+    "tarifa-envio": TarifaEnvioActualizarSchema,
+}
+
+
+def _filtros(schema):
+    argumentos = {
+        clave: valor
+        for clave, valor in request.args.items()
+        if clave not in ("pagina", "por_pagina")
+    }
+    try:
+        return schema.load(argumentos)
+    except ValidationError as error:
+        raise ApiError(
+            "VALIDACION",
+            "Parámetros inválidos",
+            400,
+            [
+                {"campo": str(campo), "mensaje": str(mensaje)}
+                for campo, mensaje in error.messages.items()
+            ],
+        )
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/api/v1")
 
@@ -95,31 +147,74 @@ def listar_clientes():
 @admin_bp.get("/clientes/<int:cliente_id>")
 @roles_requeridos("ADMIN")
 def obtener_cliente(cliente_id):
-    usuario = usuario_service.obtener_usuario(cliente_id)
-    if usuario.rol.codigo != "CLIENTE":
-        raise ApiError("CLIENTE_NO_ENCONTRADO", "Cliente no encontrado", 404)
-    return jsonify(UsuarioSchema().dump(usuario))
+    return jsonify(admin_service.cliente_detalle(cliente_id))
 
 
 @admin_bp.get("/bitacora")
 @roles_requeridos("ADMIN")
 def listar_bitacora():
     pagina, por_pagina = parametros_paginacion()
-    total = db.session.scalar(select(func.count()).select_from(Bitacora)) or 0
-    filas = db.session.execute(
-        select(Bitacora)
-        .order_by(Bitacora.id.desc())
-        .offset((pagina - 1) * por_pagina)
-        .limit(por_pagina)
-    ).scalars()
     return jsonify(
-        {
-            "items": BitacoraSchema(many=True).dump(filas),
-            "total": total,
-            "pagina": pagina,
-            "por_pagina": por_pagina,
-        }
+        admin_service.listar_bitacora(
+            _filtros(BitacoraFiltrosSchema()), pagina, por_pagina
+        )
     )
+
+
+@admin_bp.get("/catalogos/<string:catalogo>")
+@roles_requeridos("ADMIN")
+def listar_catalogo(catalogo):
+    pagina, por_pagina = parametros_paginacion()
+    return jsonify(
+        admin_service.listar(
+            catalogo, _filtros(CatalogoAdminFiltrosSchema()), pagina, por_pagina
+        )
+    )
+
+
+@admin_bp.post("/catalogos/<string:catalogo>")
+@roles_requeridos("ADMIN")
+def crear_catalogo(catalogo):
+    schema = CREAR_CATALOGO.get(catalogo)
+    if schema is None:
+        raise ApiError("CATALOGO_NO_ENCONTRADO", "Catálogo no encontrado", 404)
+    datos = cuerpo(schema())
+    return jsonify(
+        admin_service.crear(
+            catalogo, datos, usuario_actual().id, request.remote_addr
+        )
+    ), 201
+
+
+@admin_bp.get("/catalogos/<string:catalogo>/<int:elemento_id>")
+@roles_requeridos("ADMIN")
+def obtener_catalogo(catalogo, elemento_id):
+    return jsonify(admin_service.obtener(catalogo, elemento_id))
+
+
+@admin_bp.patch("/catalogos/<string:catalogo>/<int:elemento_id>")
+@roles_requeridos("ADMIN")
+def actualizar_catalogo(catalogo, elemento_id):
+    schema = ACTUALIZAR_CATALOGO.get(catalogo)
+    if schema is None:
+        raise ApiError("CATALOGO_NO_ENCONTRADO", "Catálogo no encontrado", 404)
+    datos = cuerpo(schema(), parcial=True)
+    if not datos:
+        raise ApiError("VALIDACION", "Se requiere al menos un campo", 400)
+    return jsonify(
+        admin_service.actualizar(
+            catalogo, elemento_id, datos, usuario_actual().id, request.remote_addr
+        )
+    )
+
+
+@admin_bp.delete("/catalogos/<string:catalogo>/<int:elemento_id>")
+@roles_requeridos("ADMIN")
+def eliminar_catalogo(catalogo, elemento_id):
+    admin_service.eliminar(
+        catalogo, elemento_id, usuario_actual().id, request.remote_addr
+    )
+    return "", 204
 
 
 @admin_bp.get("/configuracion")

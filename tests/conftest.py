@@ -175,7 +175,11 @@ def tienda(app, mysql_disponible):
             db.session.commit()
             productos.append(producto.id)
             variantes.append(variante.id)
-            return {"producto_id": producto.id, "variante_id": variante.id}
+            return {
+                "producto_id": producto.id,
+                "variante_id": variante.id,
+                "sku": variante.sku,
+            }
 
     def crear_cliente(rol="CLIENTE"):
         correo = f"tienda-{secrets.token_hex(6)}@example.com"

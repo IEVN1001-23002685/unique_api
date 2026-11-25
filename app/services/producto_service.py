@@ -1,11 +1,8 @@
 """Casos de uso de productos, variantes, imágenes y activación (M10)."""
 
-import io
 import os
-import secrets
 from datetime import datetime, timezone
 
-from flask import current_app
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
@@ -32,15 +29,10 @@ from app.services import receta_service
 from app.services.bitacora_service import registrar_bitacora
 from app.services.configuracion_service import valor_entero
 from app.utils.errores import ApiError
+from app.utils.imagenes import guardar_imagen, ruta_archivo
 
 TALLAS_CON_TALLA = ("CH", "MD", "GD")
 TALLAS_UNICA = ("UN",)
-EXTENSIONES = {
-    "JPEG": ("jpg", "image/jpeg"),
-    "PNG": ("png", "image/png"),
-    "WEBP": ("webp", "image/webp"),
-}
-TAMANO_MAXIMO = 2 * 1024 * 1024
 
 
 def _ahora():
@@ -519,36 +511,7 @@ def desactivar(producto_id: int, usuario_id: int, ip=None) -> None:
 
 
 def _guardar_archivo(archivo) -> tuple:
-    datos = archivo.read(TAMANO_MAXIMO + 1)
-    if len(datos) > TAMANO_MAXIMO:
-        raise ApiError("ARCHIVO_GRANDE", "La imagen no puede superar 2 MB", 400)
-    if not datos:
-        raise ApiError("ARCHIVO_VACIO", "El archivo de imagen está vacío", 400)
-
-    mime = (archivo.mimetype or "").lower()
-    try:
-        from PIL import Image, UnidentifiedImageError
-    except ImportError:
-        raise ApiError("IMAGEN_NO_VALIDA", "No se pudo verificar la imagen", 422)
-    try:
-        with Image.open(io.BytesIO(datos)) as imagen:
-            formato = imagen.format
-            imagen.verify()
-    except (UnidentifiedImageError, OSError, ValueError):
-        raise ApiError("IMAGEN_NO_VALIDA", "El archivo no es una imagen válida", 422)
-    permitido = EXTENSIONES.get(formato)
-    if permitido is None or mime != permitido[1]:
-        raise ApiError("IMAGEN_NO_VALIDA", "Formato o MIME de imagen no permitido", 422)
-
-    directorio = current_app.config.get("UPLOAD_FOLDER") or "/var/lib/unique/uploads"
-    nombre = f"{secrets.token_hex(16)}.{permitido[0]}"
-    try:
-        os.makedirs(directorio, exist_ok=True)
-        with open(os.path.join(directorio, nombre), "xb") as destino:
-            destino.write(datos)
-    except OSError:
-        raise ApiError("ERROR_ALMACENAMIENTO", "No se pudo guardar la imagen", 500)
-    return nombre, f"/uploads/{nombre}"
+    return guardar_imagen(archivo)
 
 
 def agregar_imagen(producto_id: int, archivo, usuario_id: int, ip=None, datos=None) -> dict:
@@ -585,9 +548,8 @@ def agregar_imagen(producto_id: int, archivo, usuario_id: int, ip=None, datos=No
     except Exception:
         db.session.rollback()
         if nombre:
-            directorio = current_app.config.get("UPLOAD_FOLDER") or "/var/lib/unique/uploads"
             try:
-                os.remove(os.path.join(directorio, nombre))
+                os.remove(ruta_archivo(nombre))
             except OSError:
                 pass
         raise

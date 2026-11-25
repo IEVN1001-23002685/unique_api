@@ -40,7 +40,7 @@ El servidor se llama `mysql` y las credenciales son `MYSQL_USER` / `MYSQL_PASSWO
 
 | Servicio | Imagen | Observaciones |
 |---|---|---|
-| `api` | `python:3.11-slim` | Dockerfile propio, Gunicorn, usuario `app` (no root) |
+| `api` | `python:3.11-slim` | Dockerfile propio, Supervisor (Gunicorn + scheduler), usuario `app` (no root) |
 | `mysql` | `mysql:8.4.3` | Exacta, volumen `mysql_data` |
 | `phpmyadmin` | `phpmyadmin:5.2.3` | Exacta, `PMA_HOST=mysql` |
 

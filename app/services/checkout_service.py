@@ -12,8 +12,6 @@ from app.models import (
     Pago,
     Pedido,
     PedidoLinea,
-    Preparacion,
-    PreparacionLinea,
     VarianteProducto,
     Venta,
     VentaDireccion,
@@ -151,6 +149,26 @@ def _serializar_resumen(resumen: dict) -> dict:
     return resultado
 
 
+def subtotal_lineas(lineas: list) -> Decimal:
+    return _subtotal(lineas)
+
+
+def resumen_lineas(usuario_id: int, lineas: list, datos: dict) -> dict:
+    return _resumen(usuario_id, lineas, datos)
+
+
+def serializar_resumen(resumen: dict) -> dict:
+    return _serializar_resumen(resumen)
+
+
+def direccion_de_datos(usuario_id: int, datos: dict):
+    return _direccion(usuario_id, datos)
+
+
+def datos_direccion(direccion) -> dict:
+    return _datos_direccion(direccion)
+
+
 def cotizar(usuario_id: int, datos: dict) -> dict:
     lineas, _ = carrito_service.lineas_para_checkout(usuario_id)
     return _serializar_resumen(_resumen(usuario_id, lineas, datos))
@@ -172,15 +190,28 @@ def validar_descuento(usuario_id: int, datos: dict) -> dict:
     }
 
 
-def _crear_venta_y_lineas(usuario_id, datos, resumen, lineas, referencia, resultado_pago):
+def crear_venta_y_lineas(
+    usuario_id,
+    datos,
+    resumen,
+    lineas,
+    referencia,
+    resultado_pago,
+    canal="TIENDA",
+    estado_pago="PAGADA",
+    creada_por=None,
+    registrar_pago=True,
+):
+    """Crea la venta, sus copias de dirección y, si aplica, el cobro."""
     fecha_promesa = resumen["fecha_promesa"]
+    resultado_pago = resultado_pago or {}
     venta = Venta(
         folio=generar_folio("UNQ"),
         usuario_id=usuario_id,
-        canal="TIENDA",
+        canal=canal,
         fecha=_ahora(),
         estado="ACTIVA",
-        estado_pago="PAGADA",
+        estado_pago=estado_pago,
         subtotal=resumen["subtotal"],
         descuento_id=resumen["descuento"]["descuento_id"] if resumen["descuento"] else None,
         descuento_monto=resumen["descuento_monto"],
@@ -190,7 +221,7 @@ def _crear_venta_y_lineas(usuario_id, datos, resumen, lineas, referencia, result
         iva_incluido=True,
         requiere_factura=bool(datos.get("requiere_factura")),
         fecha_promesa=fecha_promesa,
-        creada_por=usuario_id,
+        creada_por=usuario_id if creada_por is None else creada_por,
         notas=datos.get("notas"),
     )
     db.session.add(venta)
@@ -241,25 +272,27 @@ def _crear_venta_y_lineas(usuario_id, datos, resumen, lineas, referencia, result
         VentaDireccion(venta_id=venta.id, tipo="FACTURACION", **datos_facturacion)
     )
 
-    db.session.add(
-        Pago(
-            venta_id=venta.id,
-            tipo="COBRO",
-            metodo=resultado_pago["metodo"],
-            estado="APROBADO",
-            medio_pago_id=resultado_pago["medio_pago_id"],
-            monto=resumen["total"],
-            referencia=referencia,
-            ultimos4=resultado_pago["ultimos4"],
-            titular=resultado_pago["titular"],
-            registrado_por=usuario_id,
+    if registrar_pago:
+        db.session.add(
+            Pago(
+                venta_id=venta.id,
+                tipo="COBRO",
+                metodo=resultado_pago["metodo"],
+                estado="APROBADO",
+                medio_pago_id=resultado_pago.get("medio_pago_id"),
+                monto=resumen["total"],
+                referencia=referencia,
+                ultimos4=resultado_pago.get("ultimos4"),
+                titular=resultado_pago.get("titular"),
+                registrado_por=usuario_id,
+            )
         )
-    )
     db.session.flush()
     return venta
 
 
-def _crear_pedido(usuario_id, datos, resumen, lineas, venta, stocks):
+def crear_pedido(usuario_id, datos, resumen, lineas, venta, stocks, pago_aprobado=True):
+    """Crea el pedido y reserva existencias; con pago pendiente lo deja en RECIBIDO."""
     pedido = Pedido(
         venta_id=venta.id,
         estado="RECIBIDO",
@@ -313,34 +346,34 @@ def _crear_pedido(usuario_id, datos, resumen, lineas, venta, stocks):
             )
         variantes_tocadas.append(variante_id)
 
-    pedido.estado = "EN_PRODUCCION" if hay_pendiente else "CONFIRMADO"
-    pedido.estado_desde = _ahora()
     pedido_service.agregar_evento(
         pedido, "RECIBIDO", "Pedido recibido correctamente", usuario_id=usuario_id
     )
-    pedido_service.agregar_evento(
-        pedido,
-        pedido.estado,
-        (
-            "Existencia reservada; el pedido pasa a preparación"
-            if not hay_pendiente
-            else "Existencia parcial; el faltante queda pendiente de producción"
-        ),
-        usuario_id=usuario_id,
-    )
-
-    if not hay_pendiente:
-        preparacion = Preparacion(pedido_id=pedido.id, estado="POR_SURTIR")
-        db.session.add(preparacion)
-        db.session.flush()
-        for pedido_linea, _ in parejas:
-            db.session.add(
-                PreparacionLinea(
-                    preparacion_id=preparacion.id,
-                    pedido_linea_id=pedido_linea.id,
-                    cantidad_requerida=pedido_linea.cantidad,
-                )
-            )
+    if pago_aprobado:
+        pedido.estado = "EN_PRODUCCION" if hay_pendiente else "CONFIRMADO"
+        pedido.estado_desde = _ahora()
+        pedido_service.agregar_evento(
+            pedido,
+            pedido.estado,
+            (
+                "Existencia reservada; el pedido pasa a preparación"
+                if not hay_pendiente
+                else "Existencia parcial; el faltante queda pendiente de producción"
+            ),
+            usuario_id=usuario_id,
+        )
+        if not hay_pendiente:
+            pedido_service.crear_preparacion(pedido, [linea for linea, _ in parejas])
+    else:
+        pedido.estado = "RECIBIDO"
+        pedido.estado_desde = _ahora()
+        pedido_service.agregar_evento(
+            pedido,
+            "RECIBIDO",
+            "Pago pendiente de validar; las existencias quedan reservadas",
+            visible_cliente=False,
+            usuario_id=usuario_id,
+        )
     return pedido, variantes_tocadas
 
 
@@ -377,10 +410,10 @@ def _pagar_transaccion(usuario_id, datos, registro):
             [{"motivo": resultado_pago["motivo"]}],
         )
 
-    venta = _crear_venta_y_lineas(
+    venta = crear_venta_y_lineas(
         usuario_id, datos, resumen, lineas, referencia, resultado_pago
     )
-    pedido, variantes_tocadas = _crear_pedido(
+    pedido, variantes_tocadas = crear_pedido(
         usuario_id, datos, resumen, lineas, venta, stocks
     )
 

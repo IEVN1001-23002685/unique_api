@@ -1,9 +1,11 @@
 # Contrato HTTP
 
-Prefijo global: `/api/v1`. Estado: Fases 0 a 4 implementadas y verificadas. La Fase 4
-cubre producción (M16) y mermas (M17), con PEPS, idempotencia, dictamen de calidad,
-asignación FIFO a pedidos y reversos. Los módulos M07–M09, M18–M21 y el resto de M22 se
-documentarán al implementarse.
+Prefijo global: `/api/v1`. Estado: Fases 0 a 6 implementadas y verificadas. La Fase 5
+cubre ventas (M08), pedidos administrativos (M09) y cambios/devoluciones (M07), con
+reembolsos simulados, venta de reemplazo a `$0.00`, dictamen de devoluciones y
+cancelación administrativa hasta `LISTO_ENVIO`. La Fase 6 cubre preparación (M18),
+entregas (M19), dashboard (M20), alertas (M21), catálogos administrativos y tareas
+programadas.
 
 ## Endpoints implementados
 
@@ -373,7 +375,157 @@ Errores: `401`, `403`, `404 MERMA_NO_ENCONTRADA`, `409 MERMA_YA_REVERSADA`/
 `LOTE_NO_DISPONIBLE`/`MATERIAL_INSUFICIENTE`, `422 ORIGEN_INVALIDO`/`ETAPA_INVALIDA`/
 `CANTIDAD_INVALIDA`/`CAUSA_MERMA_NO_DISPONIBLE`/`VARIANTE_REQUERIDA`/`REVERSO_INVALIDO`.
 
-## M22 — Administración (parcial)
+## M07 — Cambios y devoluciones
+
+| Método | Ruta | Rol | Parámetros / cuerpo | Respuesta |
+|---|---|---|---|---|
+| `POST` | `/devoluciones` | C | `pedido_id`, `tipo`, `motivo`, `descripcion`, `lineas[]`; opcional multipart `evidencias` (JPG/PNG/WebP, ≤2 MB) | Devolución `SOLICITADA` (`201`) |
+| `GET` | `/devoluciones` | C, O, A | `estado`, `tipo`, `motivo`, `desde`, `hasta`, `q`, paginación | Lista paginada (`200`) |
+| `PATCH` | `/devoluciones/{id}/aprobar` | A | — | Devolución `APROBADA` (`200`) |
+| `PATCH` | `/devoluciones/{id}/rechazar` | A | `motivo` | Devolución `RECHAZADA` (`200`) |
+| `POST` | `/devoluciones/{id}/recibir` | O, A | — | Devolución `RECIBIDA` (`200`) |
+| `POST` | `/devoluciones/{id}/dictamen` | O, A | `lineas[]` con `devolucion_linea_id`, `dictamen` (`REINGRESO`/`MERMA`), `causa_id` opcional | Devolución dictaminada (`200`) |
+| `POST` | `/devoluciones/{id}/resolver` | A | `resolucion` (`REEMBOLSO`/`CAMBIO`) | Devolución `RESUELTA` (`200`) |
+
+`tipo` es `DEVOLUCION` o `CAMBIO`; `motivo` es `DEFECTO`, `AJUSTE`, `DANO_ENVIO`,
+`PRODUCTO_EQUIVOCADO` o `ARREPENTIMIENTO`. Solo se aceptan pedidos `ENTREGADO` dentro de
+`dias_devolucion` (configurable, propuesta 15 días) y hasta la cantidad vendida no devuelta.
+Las solicitudes de cambio requieren `variante_cambio_id` por línea.
+
+La recepción cambia el estado a `RECIBIDA` y abre una alerta de inspección. El dictamen
+de `REINGRESO` incrementa `existencia` con movimiento `REINGRESO`; el de `MERMA` delega en
+`merma_service` con `descontar=False`, sin modificar el histórico de movimientos. La
+resolución por `REEMBOLSO` calcula el importe prorrateado de las líneas, descuenta la parte
+proporcional del cupón y excluye el envío salvo `DEFECTO`, `DANO_ENVIO` o
+`PRODUCTO_EQUIVOCADO`. La resolución por `CAMBIO` crea una venta `CAMBIO` con total
+`$0.00`, su pago y su pedido, sin tarjeta ni CVV.
+
+`OPERATIVO` no recibe `reembolso_monto` ni datos financieros. Errores: `401`, `403`,
+`404 PEDIDO_NO_ENCONTRADO`/`DEVOLUCION_NO_ENCONTRADA`, `409 ESTADO_NO_VALIDO`/
+`DICTAMEN_DUPLICADO`, `422 PEDIDO_NO_ENTREGADO`/`VENTANA_DEVOLUCION_CERRADA`/
+`CANTIDAD_DEVOLUCION_INVALIDA`/`DICTAMEN_PENDIENTE`/`CAMBIO_NO_SOLICITADO`.
+
+## M08 — Ventas, pagos y descuentos
+
+| Método | Ruta | Rol | Parámetros / cuerpo | Respuesta |
+|---|---|---|---|---|
+| `GET` | `/ventas` | A | `desde`, `hasta`, `canal`, `estado`, `estado_pago`, `q`, paginación | Lista paginada (`200`) |
+| `GET` | `/ventas/{id}` | A | — | Venta con líneas, direcciones, pagos y pedido (`200`) |
+| `POST` | `/ventas/manual` | A | `cliente_id` o `cliente`, `lineas[]` con `sku`, `direccion`, `metodo_pago`, `estado_pago`, opcionalmente pago, RFC y descuento | Venta creada (`201`) |
+| `POST` | `/ventas/{id}/pago` | A | `accion` (`APROBAR`/`RECHAZAR`), `metodo_pago`, datos de tarjeta o `medio_pago_id`, `motivo` | Venta actualizada (`200`) |
+| `POST` | `/ventas/{id}/cancelar` | A | `motivo` | Venta cancelada, reservas liberadas y reembolso simulado (`200`) |
+| `POST` | `/ventas/{id}/reembolso` | A | `monto` opcional, `motivo` | Venta con `estado_pago` actualizado (`200`) |
+| `GET` | `/descuentos` | A | `activo`, `aplicacion`, `q`, paginación | Lista paginada (`200`) |
+| `POST` | `/descuentos` | A | `codigo`, `nombre`, `tipo`, `valor`, `aplicacion`, vigencia, límites de uso | Descuento (`201`) |
+| `PATCH` | `/descuentos/{id}` | A | Campos parciales del descuento | Descuento (`200`) |
+| `DELETE` | `/descuentos/{id}` | A | — | `204`; borrado lógico si ya se usó, físico si no |
+
+`metodo_pago` es `TARJETA`, `CUENTA`, `TRANSFERENCIA` o `EFECTIVO`. Con `estado_pago =
+PENDIENTE` el pedido queda en `RECIBIDO` y se abre `PAGO_PENDIENTE`; al aprobarlo se activa
+a `CONFIRMADO` o `EN_PRODUCCION` según la reserva. El reembolso se limita al saldo pendiente
+de la venta y actualiza `estado_pago` a `REEMBOLSADA` o `REEMBOLSADA_PARCIAL`. No se guarda
+el número completo de tarjeta ni el CVV.
+
+Errores: `401`, `403`, `404 VENTA_NO_ENCONTRADA`/`SKU_NO_DISPONIBLE`/
+`DESCUENTO_NO_ENCONTRADO`, `409 VENTA_CANCELADA`/`PAGO_YA_APROBADO`/`CODIGO_DUPLICADO`,
+`422 PAGO_RECHAZADO`/`MONTO_REEMBOLSO_INVALIDO`/`VALOR_DESCUENTO_INVALIDO`.
+
+## M09 — Pedidos administrativos
+
+| Método | Ruta | Rol | Parámetros / cuerpo | Respuesta |
+|---|---|---|---|---|
+| `GET` | `/pedidos` | A, O | `estado`, `prioridad`, `desde`, `hasta`, `q`, paginación | Lista paginada (`200`) |
+| `GET` | `/pedidos/pendientes-produccion` | A, O | `semaforo`, `sku`, paginación | Demanda pendiente por SKU (`200`) |
+| `GET` | `/pedidos/{id}` | A, O | — | Detalle con cliente, canal, semáforo, órdenes, preparación y entrega (`200`) |
+| `PATCH` | `/pedidos/{id}` | A | `prioridad`, `nota` | Pedido actualizado con evento interno (`200`) |
+| `POST` | `/pedidos/{id}/cancelar` | A | `motivo` | Pedido cancelado (`200`) |
+
+La lista de pendientes reutiliza `produccion_service.pendientes_lineas`; M09 no duplica la
+lógica de M16 y mantiene `/produccion/pendientes-produccion` como ruta equivalente. La
+cancelación administrativa admite estados hasta `LISTO_ENVIO`, libera reservas, ajusta
+órdenes vinculadas, cancela la venta y genera el reembolso simulado correspondiente. El
+detalle para `ADMIN` incluye costos; el de `OPERATIVO` omite costos, márgenes y precios de compra.
+
+Errores: `401`, `403`, `404 PEDIDO_NO_ENCONTRADO`, `409 ESTADO_NO_CANCELABLE`,
+`422 VALIDACION`.
+
+## M18 — Preparación, verificación y empaque
+
+| Método | Ruta | Rol | Parámetros / cuerpo | Respuesta |
+|---|---|---|---|---|
+| `GET` | `/preparacion/cola` | O | `estado` (`POR_SURTIR`, `EN_PICKING`, `EN_VERIFICACION`, `EN_EMPAQUE`, `LISTA`), paginación | Preparaciones de pedidos `CONFIRMADO` ordenadas por prioridad y fecha promesa (`200`) |
+| `POST` | `/preparacion/{pedido_id}/tomar` | O | — | Preparación en `EN_PICKING`; crea la preparación si no existe (`200`) |
+| `PATCH` | `/preparacion/{id}/lineas` | O | `lineas[]` con `preparacion_linea_id`, `cantidad_surtida`, `sku`, `sku_verificado`, `diseno_verificado`, `etiquetas_verificadas` | Preparación con validación de surtido (`200`) |
+| `POST` | `/preparacion/{id}/incidencia` | O | `preparacion_linea_id`, `tipo` (`SKU`, `CANTIDAD`, `CALIDAD`), `descripcion`, `cantidad` opcional | Incidencia registrada (`201`) |
+| `POST` | `/preparacion/{id}/empacar` | O | — | Preparación `LISTA`, pedido `LISTO_ENVIO` y empaque consumido por PEPS (`200`) |
+| `GET` | `/preparacion/{id}/etiqueta` | O | — | Etiqueta en `application/pdf` con folio, destinatario, dirección, CP, teléfono y QR (`200`) |
+
+El identificador de `/preparacion/{pedido_id}/tomar` es el **pedido**; los demás usan
+el **id de preparación**. `marcar_empaque` consume las reglas sembradas `EMP-BOL` y
+`EMP-PAP` por prenda y `EMP-TAR` y `EMP-ETE` por pedido, con consumo PEPS. Todas las
+líneas requieren las tres verificaciones antes de empacar. Errores: `401`, `403`,
+`404 PREPARACION_NO_ENCONTRADA`/`PEDIDO_NO_ENCONTRADO`, `409 PEDIDO_NO_PREPARABLE`/
+`PREPARACION_NO_DISPONIBLE`/`PREPARACION_NO_EDITABLE`/`LINEA_NO_PERTENECE`/
+`VERIFICACION_INCOMPLETA`/`MATERIAL_INSUFICIENTE`, `422 VALIDACION`.
+
+## M19 — Entregas y repartidores
+
+| Método | Ruta | Rol | Parámetros / cuerpo | Respuesta |
+|---|---|---|---|---|
+| `GET` | `/entregas/por-asignar` | O | `codigo_postal` opcional, paginación | Pedidos `LISTO_ENVIO` sin entrega vigente (`200`) |
+| `POST` | `/entregas` | O | `pedido_id`, `repartidor_id`, `fecha_programada`, `notas` opcional | Entrega `PROGRAMADA` con folio `EN-AAAA-NNNNNN` (`201`) |
+| `POST` | `/entregas/{id}/salida` | O | — | Entrega `EN_RUTA`; `SALIDA_ENVIO` descuenta existencia y reserva (`200`) |
+| `POST` | `/entregas/{id}/resultado` | O | `entregado`, `receptor`, `motivo_fallo`, `notas` | Entrega `ENTREGADA` o `FALLIDA` con reingreso y Control de intentos (`200`) |
+| `GET` | `/entregas/hoja-reparto?repartidor&fecha` | O | `repartidor`, `fecha`, paginación | Hoja de reparto en `application/pdf` (`200`) |
+| `GET` | `/entregas/productos-repartidos` | O | `repartidor`, `desde`, `hasta`, paginación | Unidades entregadas por SKU (`200`) |
+| `GET` | `/repartidores` | A | `activo`, paginación | Lista paginada (`200`) |
+| `POST` | `/repartidores` | A | `nombre`, `telefono` (10 dígitos), `vehiculo` opcional | Repartidor creado (`201`) |
+| `PATCH` | `/repartidores/{id}` | A | Campos parciales | Repartidor actualizado (`200`) |
+| `DELETE` | `/repartidores/{id}` | A | — | `204`, borrado lógico |
+
+Los fallos reingresan `+existencia` y `+reservado` (`REINGRESO`) porque la salida ya los
+había descontado. Con `max_intentos_entrega = 2` (propuesta configurable), el segundo
+fallo abre `ENTREGA_FALLIDA` con severidad `CRITICA`. Errores: `401`, `403`,
+`404 PEDIDO_NO_ENCONTRADO`/`ENTREGA_NO_ENCONTRADA`/`REPARTIDOR_NO_ENCONTRADO`,
+`409 ESTADO_NO_VALIDO`/`ENTREGA_DUPLICADA`/`REPARTIDOR_INACTIVO`, `422 VALIDACION`.
+
+## M20 — Dashboard
+
+| Método | Ruta | Rol | Respuesta |
+|---|---|---|---|
+| `GET` | `/dashboard/resumen` | A | KPIs generales desde vistas agregadas (`200`) |
+| `GET` | `/dashboard/ventas` | A | Ingresos, unidades y ticket por periodo (`200`) |
+| `GET` | `/dashboard/produccion` | A, O | Órdenes, semáforos y aprobación; sin datos financieros para O (`200`) |
+| `GET` | `/dashboard/abastecimiento` | A, O | Inventario de material, puntualidad y compras; sin costos para O (`200`) |
+| `GET` | `/dashboard/logistica` | A, O | Preparación, entregas y fallos (`200`) |
+| `GET` | `/dashboard/exportar` | A | CSV `text/csv; charset=utf-8` con `Content-Disposition: attachment` (`200`) |
+
+Los filtros son `desde` y `hasta` según el recurso. Las consultas usan
+`v_ventas_sku`, `v_merma_resumen`, `v_inventario_material`, `v_capacidad_variante` y
+`v_pedidos_estancados`, con parámetros enlazados. El serializador de `OPERATIVO` omite
+costo estándar, precio de compra, costo total, márgenes y utilidades. Errores: `401`,
+`403`, `400 VALIDACION`.
+
+## M21 — Alertas y reglas
+
+| Método | Ruta | Rol | Parámetros / cuerpo | Respuesta |
+|---|---|---|---|---|
+| `GET` | `/alertas` | A, O | `estado` (`ABIERTA`, `ATENDIDA`, `RESUELTA_AUTO`), `tipo`, `severidad`, paginación | Alertas vigentes (`200`) |
+| `GET` | `/alertas/resueltas` | A, O | Filtros anteriores, paginación | Alertas resueltas automáticamente (`200`) |
+| `GET` | `/alertas/reglas` | A | — | Reglas configurables (`200`) |
+| `PATCH` | `/alertas/reglas` | A | `reglas[]` con `clave` y `valor` numérico | Reglas actualizadas (`200`) |
+| `POST` | `/alertas/{id}/accion` | A, O | `accion` (`ATENDER`, `GENERAR_PRODUCCION`, `GENERAR_REQUISICION`, `EVALUAR_PROVEEDOR`), `nota` opcional | Alerta y resultado de la acción (`200`) |
+
+Una alerta abierta con la misma `clave_unica` no se duplica; al cerrarse libera la
+clave. `elevar` aumenta la severidad y `atender` registra la atención. Las once reglas
+viven en `configuracion`, sin tabla adicional. Catálogo implementado: `PT_AGOTADO_DEMANDA`,
+`PT_STOCK_MINIMO`, `MP_INSUFICIENTE`, `MP_REORDEN`, `ORDEN_ROJA`, `OC_RETRASADA`,
+`PEDIDO_ESTANCADO`, `MERMA_ALTA`, `DIFERENCIA_CONTEO`, `ENTREGA_FALLIDA`,
+`DEVOLUCION_PENDIENTE`, `PAGO_PENDIENTE`, `PROVEEDOR_EN_REVISION` y `DISENO_PENDIENTE`.
+Errores: `401`, `403`, `404 ALERTA_NO_ENCONTRADA`/`REGLA_NO_ENCONTRADA`,
+`409 ALERTA_YA_ATENDIDA`/`ACCION_NO_DISPONIBLE`, `422 VALIDACION`.
+
+## M22 — Administración
 
 | Método | Ruta | Rol | Respuesta |
 |---|---|---|---|
@@ -383,14 +535,36 @@ Errores: `401`, `403`, `404 MERMA_NO_ENCONTRADA`, `409 MERMA_YA_REVERSADA`/
 | `PATCH` | `/usuarios/{id}` | A | Actualiza campos permitidos |
 | `DELETE` | `/usuarios/{id}` | A | `204`, desactivación lógica |
 | `GET` | `/clientes` | A | Lista paginada de `CLIENTE` |
-| `GET` | `/clientes/{id}` | A | Cliente |
+| `GET` | `/clientes/{id}` | A | Cliente con `resumen` y pedidos |
+| `GET`, `POST` | `/catalogos/{recurso}` | A | Lista paginada / `201` |
+| `GET`, `PATCH`, `DELETE` | `/catalogos/{recurso}/{id}` | A | Elemento / actualizado / `204` |
 | `GET` | `/bitacora` | A | Lista paginada de acciones sensibles |
 | `GET` | `/configuracion` | A | Parámetros del sistema |
 | `PATCH` | `/configuracion` | A | Actualiza uno o varios parámetros |
 
-`OPERATIVO` **no** puede administrar usuarios; `ADMIN` sí puede ejecutar acciones de
-`OPERATIVO`. No se puede desactivar ni cambiar el rol al último `ADMIN` activo
-(`422 ULTIMO_ADMIN`).
+Los recursos de catálogo son exactamente seis: `color`, `talla`, `categoria-producto`,
+`categoria-material`, `causa-merma` y `tarifa-envio`. Los códigos usados en SKU
+(`color.codigo`, `talla.codigo`, `categoria-producto.prefijo_sku`) son inmutables
+después de crearlos (`409 CODIGO_SKU_INMUTABLE`). No se elimina un catálogo con
+registros relacionados (`409 CATALOGO_EN_USO`). Las tarifas nuevas no se solapan
+(`409 RANGO_TARIFA_SOLAPADO`). `OPERATIVO` **no** puede administrar usuarios ni
+catálogos; `ADMIN` sí puede ejecutar acciones de `OPERATIVO`. No se puede desactivar
+ni cambiar el rol al último `ADMIN` activo (`422 ULTIMO_ADMIN`).
+
+## Tareas programadas
+
+El scheduler es un proceso único dentro del contenedor `api`, iniciado por Supervisor
+como `python -m app.jobs`. Usa `GET_LOCK('unique_scheduler', 5)` en MySQL para evitar
+duplicados si se escalan workers.
+
+| Tarea | Frecuencia | Servicio invocado |
+|---|---|---|
+| `evaluar_estancamientos` | Cada 15 min | Pedidos, órdenes y compras retrasadas → alertas |
+| `recalcular_semaforos` | Cada 15 min | `produccion_service.recalcular_semaforos` |
+| `cerrar_alertas_resueltas` | Cada 15 min | `alertas_service.cerrar` por clave |
+| `abandonar_carritos` | Diaria | Carritos sin cambios en `dias_carrito_abandonado` |
+| `evaluar_proveedores` | Diaria | `proveedor_service.evaluacion(persistir=True)` |
+| `limpiar_tokens` | Diaria | Tokens de refresco vencidos o revocados |
 
 ## Contrato común
 
@@ -403,12 +577,18 @@ Errores: `401`, `403`, `404 MERMA_NO_ENCONTRADA`, `409 MERMA_YA_REVERSADA`/
 
 ## Pendiente
 
-Los blueprints M01–M06, M10–M17 y parte de M22 están documentados. Quedan pendientes M07–M09,
-M18–M21 y el resto de M22, además de las tareas programadas y el dashboard. La tabla completa
-de rutas requeridas está en la sección 11 del documento integral y en `AGENTS.md`.
+Los blueprints M01–M22 están documentados, incluyendo tareas programadas, dashboard y
+catálogos administrativos. Los documentos PDF se sirven como `application/pdf` y el
+exportable del dashboard como `text/csv; charset=utf-8`. La tabla completa de rutas
+requeridas está en la sección 11 del documento integral y en `AGENTS.md`.
 
 Pendientes concretos, registrados también en `decisiones-tecnicas.md`:
 
 - Cerrar órdenes de compra con faltante previa confirmación de `ADMIN`.
 - Exigir dos cotizaciones cuando exista proveedor alterno.
 - Restringir `UPDATE`/`DELETE` de tablas de movimientos con trigger o permisos de base de datos.
+- Confirmar reglas propuestas: `dias_devolucion`, `max_intentos_entrega`,
+  `dias_produccion_estandar`, `max_piezas_por_linea`, `saldo_inicial_cuenta_simulada`,
+  tarifa «Local León» y stock mínimo/reposición de variantes.
+- Definir `activa` para `color`, `talla` y `categoria-material` si el negocio requiere
+  desactivación lógica de esos catálogos.

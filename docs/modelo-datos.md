@@ -91,6 +91,41 @@ Las relaciones nuevas que se apoyan en el modelo de Fase 1 son:
 La idempotencia de inicio de producción usa la misma tabla `idempotencia_operacion` con
 alcance `produccion:iniciar`.
 
+## Uso de tablas en Fase 5
+
+Fase 5 no añadió tablas. Los módulos M07–M09 usan los grupos 8, 9 y 10:
+
+- `venta` → `venta_linea` → `pedido_linea` conserva copias históricas de SKU, nombre,
+  talla, color, precio y subtotal. Cancelar o devolver no altera esas copias.
+- `pago` registra reembolsos simulados sin número de tarjeta ni CVV. Una venta de
+  reemplazo por `CAMBIO` crea otra venta con total `$0.00` y su propio pedido.
+- `devolucion` → `devolucion_linea` → `devolucion_evidencia` controla solicitud,
+  recepción, dictamen y resolución; el dictamen `MERMA` delega en `merma_service`.
+- `pedido_evento` registra cada transición de estado, incluida la cancelación
+  administrativa hasta `LISTO_ENVIO`.
+
+## Uso de tablas en Fase 6
+
+Fase 6 tampoco añadió tablas funcionales; M18–M22 usan los grupos 1, 2, 9, 10 y 11:
+
+- `pedido` → `preparacion` → `preparacion_linea` gestiona picking, verificación y
+  empaque. `preparacion_linea` guarda `cantidad_surtida` y las tres verificaciones
+  (`sku`, `diseno`, `etiquetas`).
+- `empaque_regla` define consumo por prenda (`EMP-BOL`, `EMP-PAP`) y por pedido
+  (`EMP-TAR`, `EMP-ETE`). El consumo usa `inventario_material` → `lote_material` por PEPS.
+- `repartidor` → `entrega` con `UNIQUE(pedido_id, intento)`; `entrega` guarda folio
+  `EN`, estado, intento, salida, resultado, receptor y motivo de fallo. La salida y el
+  reingreso escriben `movimiento_producto` con `SALIDA_ENVIO` y `REINGRESO`.
+- `alerta` centraliza las reglas de los once eventos; `clave_unica` evita duplicar
+  alertas abiertas y se libera al cerrar. Las reglas numéricas viven en
+  `configuracion`, sin una tabla adicional.
+- `bitacora` registra altas, cambios y bajas de catálogos, tarifas, usuarios y reglas
+  de alerta. El dashboard lee vistas del documento y consultas agregadas.
+
+Las seis tareas programadas solo llaman a servicios de dominio; no escriben tablas
+propias. El bloqueo `GET_LOCK('unique_scheduler', 5)` evita ejecuciones duplicadas
+entre réplicas del contenedor `api`.
+
 ## Migraciones
 
 El entorno Alembic ya existe en `migrations/`. No se usa `db.create_all()` en producción.

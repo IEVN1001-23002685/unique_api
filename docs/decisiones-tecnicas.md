@@ -43,7 +43,7 @@ confirmación del equipo.
 | Activación de producto | La matriz de roles del documento (línea 473) permite lectura M10 a `OPERATIVO`, pero la sección 11 de `AGENTS.md` exige solo `ADMIN`. Prevalece `ADMIN` para `/productos` y se mantiene `OPERATIVO` para lectura de `/recetas`, donde el documento sí lo autoriza. | Decidido según `AGENTS.md`; pendiente de confirmar |
 | Código de ajuste de inventario PT | La acción modifica existencias, por lo que responde `200` y no `201`, según el contrato general (sección 10). | Decidido |
 | Listados en memoria | `/productos`, `/recetas`, `/disenos`, `/proveedores/{id}/materiales` y `/cotizaciones` se paginan en la capa HTTP con `{items,total,pagina,por_pagina}`. No se añadió `LIMIT/OFFSET` en servicio porque estos catálogos son pequeños; se revisará si crecen. | Implementado |
-| Evaluación de proveedores | `GET /proveedores/evaluacion` es de solo lectura y devuelve el estatus derivado. La mutación de estatus y la alerta `PROVEEDOR_EN_REVISION` se dejan para la tarea diaria `evaluar_proveedores` (Fase 6). El porcentaje divide entre órdenes **recibidas**, no entre órdenes con `fecha_prometida`; sin historial se reporta `100.00` para no penalizar sin evidencia. | Decidido; tarea pendiente |
+| Evaluación de proveedores | `GET /proveedores/evaluacion` es de solo lectura y devuelve el estatus derivado. La mutación de estatus y la alerta `PROVEEDOR_EN_REVISION` la ejecuta la tarea diaria `evaluar_proveedores` con `proveedor_service.evaluacion(persistir=True)`. El porcentaje divide entre órdenes **recibidas**, no entre órdenes con `fecha_prometida`; sin historial se reporta `100.00` para no penalizar sin evidencia. | Implementado en Fase 6 |
 | Cotizaciones | El proveedor debe tener el material en su catálogo activo para cotizar. Elegir una cotización con `vigencia_hasta` vencida responde `409`. El mínimo de dos cotizaciones cuando hay alterno y el plazo de entrega por proveedor quedan pendientes: el documento no fija regla operativa completa. | Parcial; pendiente de confirmar |
 | Recepción y reservas de producción | La recepción cierra `OC_RETRASADA`, crea lotes por lo aceptado y genera merma por el rechazo. Desde Fase 4 también reintenta reservas de órdenes `PLANEADA` y cierra `MP_REORDEN` mediante `produccion_service.reevaluar_ordenes_por_recepcion`. | Implementado en Fase 4 |
 | Cierre de OC con faltante | El documento permite cerrar con faltante con confirmación de `ADMIN`, pero no define el estado final ni el efecto en la requisición. No se implementa una regla inventada. | Pendiente de confirmar |
@@ -58,7 +58,7 @@ confirmación del equipo.
 | Tema | Decisión | Estado |
 |---|---|---|
 | Semáforo de orden | El documento usa `ÁMBAR`; los códigos no llevan acentos, por lo que se serializa `AMBAR`. Los tres valores son `VERDE`, `AMBAR` y `ROJO`. | Normalizado; confirmar con el frontend |
-| `GET /pedidos/pendientes-produccion` | `AGENTS.md` lo lista en M09, pero la información pertenece a las órdenes de M16. En Fase 4 se expone `/produccion/pendientes-produccion` y se devuelven órdenes abiertas con unidades pendientes. La ruta canónica de M09 se evaluará en Fase 5 sin duplicar la lógica. | Normalizado; pendiente de M09 |
+| `GET /pedidos/pendientes-produccion` | `AGENTS.md` lo lista en M09, pero la información pertenece a las órdenes de M16. Fase 4 expuso `/produccion/pendientes-produccion`; en Fase 5 se añadió la ruta canónica de M09 y ambas delegan en `produccion_service.pendientes_lineas`. | Normalizado; implementado |
 | Reverso de merma | No se edita ni borra la merma original: se inserta una nueva fila con `reversa_de_id` único. La migración `b2c3d4e5f6a7` ajustó `v_merma_resumen` para netear reversos (`+1`/`-1`), de modo que los indicadores no dupliquen el evento. | Implementado |
 | Movimiento inverso | El reverso de material escribe `movimiento_material.tipo = REVERSA`; el de producto escribe `movimiento_producto.tipo = AJUSTE`, porque el dominio de movimientos de producto de Fase 1 no incluye `REVERSA`. Ambos llevan `documento_tipo = MERMA`, motivo y bitácora. | Implementado |
 | Merma del dictamen | Las unidades mermadas en calidad se registran con `descontar=False`: el material ya se consumió por PEPS al iniciar y la merma es de producto terminado no aprobado. La fila de merma es de `PRODUCTO` y no vuelve a descontar stock. | Implementado |
@@ -69,6 +69,37 @@ confirmación del equipo.
 | Cierre de la orden | Se cierra cuando todas las líneas tienen `aprobadas + merma = planeada`; vuelve a `EN_PROCESO` si hay reproceso y permanece `EN_REVISION` si faltan unidades por dictaminar. El reproceso se registra pero no crea merma ni PT. | Implementado |
 | Checklist de calidad | El documento enumera medidas, costuras, bordado y etiquetas. No se pueden aprobar unidades si alguno de los cuatro indicadores es `false`; el bloqueo responde `422 CHECKLIST_INCOMPLETO`. | Decidido |
 | Causa de merma por defecto | Si el dictamen no envía `causa_merma_id`, se usa una causa activa válida para `PRODUCTO` (por defecto «Defecto de acabado»). No se inventa una causa nueva. | Decidido |
+
+## Fase 5 (M07–M09)
+
+| Tema | Decisión | Estado |
+|---|---|---|
+| Ventana de devolución | Solo se solicitan cambios/devoluciones de pedidos `ENTREGADO` dentro de `dias_devolucion` (configuración inicial propuesta: 15 días, pendiente de confirmar). La fecha de entrega usa `entregado_en`, luego `estado_desde` y finalmente `fecha` de la venta. | Decidido; plazo pendiente de confirmar |
+| Cálculo del reembolso | Se prorratea el subtotal de cada línea, se descuenta la parte proporcional del cupón y se excluye el envío salvo `DEFECTO`, `DANO_ENVIO` o `PRODUCTO_EQUIVOCADO`. Nunca excede el saldo pendiente de la venta. | Implementado |
+| Venta de reemplazo | Una resolución `CAMBIO` crea una venta de canal `CAMBIO` con total `$0.00`, pago `TRANSFERENCIA` aprobado y pedido; se reutilizan los helpers de checkout. No se captura tarjeta ni CVV. | Implementado |
+| Dueño de la merma de devolución | El dictamen `MERMA` delega en `merma_service.registrar_merma` con `descontar=False` y `confirmar=False`: la operación completa confirma la transacción. El `REINGRESO` usa `stock_service` con movimiento `REINGRESO`. | Implementado |
+| Cancelación administrativa | `ADMIN` puede cancelar pedidos hasta `LISTO_ENVIO`, a diferencia de la cancelación del cliente. Libera reservas, ajusta órdenes, cancela la venta y reembolsa solo el saldo pendiente. | Implementado |
+| Venta manual impaga | `estado_pago = PENDIENTE` deja el pedido en `RECIBIDO`, mantiene la reserva y abre `PAGO_PENDIENTE`. No se crea preparación hasta aprobar el cobro. | Implementado |
+| Borrado de descuentos | Si el descuento tiene `usos_actuales > 0`, `DELETE` solo lo desactiva para conservar el histórico; si nunca se usó, se elimina físicamente. | Decidido |
+| Importes de operativo | El detalle administrativo de pedidos y las devoluciones no exponen costos, márgenes ni precios de compra a `OPERATIVO`. El total de la venta sigue visible para cumplimiento. | Implementado |
+
+## Fase 6 (M18–M22)
+
+| Tema | Decisión | Estado |
+|---|---|---|
+| Identificador de `/preparacion/{id}/tomar` | El documento usa `{id}` sin precisar si es pedido o preparación. La toma se hace por `pedido_id` porque el pedido es la entidad que cambia a `EN_PREPARACION`; las operaciones de líneas, incidencia, empaque y etiqueta usan `preparacion_id`. | Normalizado |
+| Verificación de empaque | Antes de empacar, cada línea requiere `sku_verificado`, `diseno_verificado` y `etiquetas_verificadas`. El empaque consume PEPS con las reglas sembradas: `EMP-BOL` y `EMP-PAP` por prenda, `EMP-TAR` y `EMP-ETE` por pedido. | Implementado |
+| Etiqueta y hoja de reparto | El documento no fija formato. Se genera un PDF de una página con `app/utils/pdf.py` y `Content-Type: application/pdf`, sin dependencias adicionales. | Decidido |
+| Reingreso por entrega fallida | La salida descuenta `existencia` y `reservado` con `SALIDA_ENVIO`. Un fallo posterior reingresa `+existencia` y `+reservado` con `REINGRESO`, porque la reserva sigue siendo del pedido. | Implementado |
+| Intentos de entrega | `max_intentos_entrega = 2` es propuesta editable en `configuracion`; el segundo fallo abre `ENTREGA_FALLIDA` con severidad `CRITICA`. El `CHECK` de `entrega` limita el intento a una entrega por pedido e intento. | Decidido; pendiente de confirmar |
+| Reglas de alertas | No se añade una tabla: las once reglas se leen y escriben en `configuracion` mediante `/alertas/reglas`. La alerta abierta con la misma `clave_unica` no se duplica; al cerrarse se libera la clave a `NULL`. | Implementado |
+| Elevación y atención de alertas | `alertas_service` expone `elevar` y `atender` además de `abrir` y `cerrar`. La acción desde el endpoint ejecuta el servicio correspondiente y registra la atención. | Implementado |
+| Catálogos administrativos | La sintaxis `CRUD de /catalogos/{color,talla,...}` se normalizó a seis recursos explícitos: `/catalogos/color`, `/talla`, `/categoria-producto`, `/categoria-material`, `/causa-merma` y `/tarifa-envio`. No se crea una ruta dinámica para entidades no declaradas. | Normalizado |
+| Códigos inmutables en catálogos | `color.codigo`, `talla.codigo` y `categoria-producto.prefijo_sku` participan en el SKU y no se modifican: `409 CODIGO_SKU_INMUTABLE`. Los esquemas de actualización aceptan el campo solo para detectar el cambio y devolver el conflicto. | Implementado |
+| `activa` en catálogos | `Color`, `Talla` y `CategoriaMaterial` no tienen columna `activa`. No se agregó sin justificación: la desactivación de catálogos con histórico se resuelve con reglas de uso (`409 CATALOGO_EN_USO`). Si el negocio requiere borrado lógico de estos tres catálogos, se hará en una migración dedicada. | Pendiente de confirmar |
+| Dashboard para operativo | `/dashboard/produccion`, `/abastecimiento` y `/logistica` admiten `OPERATIVO`, pero el serializador omite costos, precios de compra, márgenes y utilidades. `/resumen`, `/ventas` y `/exportar` son solo `ADMIN`. | Implementado |
+| Universo de workers del scheduler | Supervisor levanta `api` (Gunicorn) y `scheduler` en el mismo contenedor. El scheduler adquiere `GET_LOCK('unique_scheduler', 5)` en MySQL antes de iniciar APScheduler, de modo que varias réplicas no dupliquen tareas. | Implementado |
+| JSON y PDF | `/dashboard/exportar` devuelve CSV (`text/csv; charset=utf-8`) con `Content-Disposition: attachment`. La etiqueta de preparación y la hoja de reparto devuelven PDF (`application/pdf`) con `Content-Disposition: inline`. | Documentado |
 
 ## Convención de nombres
 
