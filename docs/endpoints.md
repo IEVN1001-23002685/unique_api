@@ -137,7 +137,7 @@ Errores: `400 IDEMPOTENCIA_REQUERIDA`, `409 IDEMPOTENCIA_CONFLICTO`, `409 STOCK_
 | Método | Ruta | Rol | Parámetros / cuerpo | Respuesta |
 |---|---|---|---|---|
 | `GET` | `/mis-pedidos` | C | `estado` (`TODOS`, `EN_PROCESO`, `ENVIADOS`, `ENTREGADOS`), `pagina`, `por_pagina` | Lista paginada propia (`200`) |
-| `GET` | `/mis-pedidos/{id}` | C | — | Detalle propio con artículos, eventos visibles, guía y repartidor (`200`) |
+| `GET` | `/mis-pedidos/{id}` | C | — | Detalle propio con artículos (`venta_linea_id`, `variante_id` y `producto_id` para solicitudes M07), eventos visibles, guía y repartidor (`200`) |
 | `POST` | `/mis-pedidos/{id}/cancelar` | C | `motivo` | Pedido cancelado (`200`) |
 | `GET` | `/mis-pedidos/{id}/comprobante` | C | — | Comprobante histórico (`200`) |
 

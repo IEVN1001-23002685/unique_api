@@ -53,6 +53,9 @@ class PedidoFiltrosSchema(Schema):
 
 class PedidoLineaSchema(Schema):
     id = fields.Int()
+    venta_linea_id = fields.Int()
+    variante_id = fields.Int()
+    producto_id = fields.Int()
     sku = fields.Str()
     nombre_producto = fields.Str()
     talla = fields.Str()

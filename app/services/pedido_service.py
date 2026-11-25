@@ -21,6 +21,7 @@ from app.models import (
     ProduccionPedido,
     Repartidor,
     Usuario,
+    VarianteProducto,
     Venta,
     VentaDireccion,
     VentaLinea,
@@ -145,15 +146,18 @@ def pedido_de_usuario(pedido_id: int, usuario_id: int) -> Pedido:
 
 def _lineas(pedido_id: int) -> list:
     filas = db.session.execute(
-        select(PedidoLinea, VentaLinea)
+        select(PedidoLinea, VentaLinea, VarianteProducto)
         .join(VentaLinea, VentaLinea.id == PedidoLinea.venta_linea_id)
+        .join(VarianteProducto, VarianteProducto.id == VentaLinea.variante_id)
         .where(PedidoLinea.pedido_id == pedido_id)
         .order_by(PedidoLinea.id)
     ).all()
     return [
         {
             "id": pedido_linea.id,
-            "variante_id": venta_linea.variante_id,
+            "venta_linea_id": venta_linea.id,
+            "variante_id": _variante.id,
+            "producto_id": _variante.producto_id,
             "sku": venta_linea.sku,
             "nombre_producto": venta_linea.nombre_producto,
             "talla": venta_linea.talla,
@@ -164,7 +168,7 @@ def _lineas(pedido_id: int) -> list:
             "precio_unitario": venta_linea.precio_unitario,
             "subtotal": venta_linea.subtotal,
         }
-        for pedido_linea, venta_linea in filas
+        for pedido_linea, venta_linea, _variante in filas
     ]
 
 
