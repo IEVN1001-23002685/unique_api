@@ -43,8 +43,8 @@ Ejecuta `SELECT 1`. No expone SQL, host, credenciales ni trazas.
 
 | Método | Ruta | Rol | Cuerpo | Respuesta |
 |---|---|---|---|---|
-| `POST` | `/auth/registro` | P | `nombre`, `apellidos`, `correo`, `telefono`, `password`, `acepta_promociones` | `201`, `access_token` + cookie de refresco; crea `CLIENTE` |
-| `POST` | `/auth/login` | P | `correo`, `password` | `200`, `access_token` + cookie de refresco |
+| `POST` | `/auth/registro` | P | `nombre`, `apellidos`, `correo`, `telefono`, `password`, `acepta_promociones` | `201`, `{ access_token, usuario }` + cookie de refresco; crea `CLIENTE` |
+| `POST` | `/auth/login` | P | `correo`, `password` | `200`, `{ access_token, usuario }` + cookie de refresco |
 | `POST` | `/auth/refrescar` | P | Cookie `refresh_token_cookie` | `200`, nuevo `access_token` y rotación de cookie |
 | `POST` | `/auth/logout` | autenticado | Cookie de refresco; cabecera Bearer | `200`, revoca el refresco |
 | `POST` | `/auth/recuperar` | P | `correo` | `200`, mensaje genérico |
