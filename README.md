@@ -117,6 +117,34 @@ docker compose up -d
 Los datos de MySQL y los archivos subidos viven en volúmenes nombrados y sobreviven a `down`.
 **Nunca ejecute `docker compose down -v` sin autorización explícita**: elimina los volúmenes.
 
+## Despliegue en Railway
+
+Railway no ejecuta `compose.yaml`; despliega servicios separados desde el `Dockerfile`.
+
+1. Crea un servicio **MySQL** en Railway y un servicio **API** desde este repo.
+2. En el servicio API configura variables de entorno:
+   - `APP_ENV=production`
+   - `APP_DEBUG=false`
+   - `SECRET_KEY` y `JWT_SECRET_KEY` con valores aleatorios largos y diferentes (por ejemplo, generados con `python -c "import secrets; print(secrets.token_urlsafe(48))"`). No reutilices estos secretos entre entornos.
+   - `DATABASE_URL=${{MySQL.MYSQL_URL}}`, sustituyendo `MySQL` por el nombre exacto del servicio de base de datos. Railway entrega `mysql://...`; la app y el script de espera lo normalizan a `mysql+pymysql://...`. Si la referencia no aplica, construye la URL como `mysql+pymysql://<usuario>:<contraseña-url-encoded>@<host-privado>:<puerto>/<base>?charset=utf8mb4`.
+   - `CORS_ORIGINS=https://<dominio-frontend>` con el origen real, sin ruta final; para varios orígenes, sepáralos por comas.
+   - `JWT_COOKIE_SECURE=true`
+   - `TZ=America/Mexico_City`
+   - `WEB_CONCURRENCY=1`
+3. Railway asigna `PORT`; el contenedor ya lo usa automáticamente. No fijes `APP_PORT` salvo pruebas locales.
+4. Monta un **Volume** en `/var/lib/unique/uploads` para conservar imágenes. Añade `RAILWAY_RUN_UID=0` al servicio API: Railway monta los volúmenes como `root` y la imagen ejecuta con el usuario no-root `app`.
+5. Ejecuta una vez en el shell del servicio API:
+
+```bash
+flask db upgrade
+python -m scripts.seed
+python -m scripts.create_admin admin
+```
+
+6. Después del deploy, verifica `GET /api/v1/health`, `GET /api/v1/health/db` y un inicio de sesión en `POST /api/v1/auth/login`.
+
+Notas: no instales phpMyAdmin dentro de la API. Si escalas a más de una réplica, configura `RATELIMIT_STORAGE_URI` con un almacén compartido; el límite en memoria no se comparte entre instancias. Si escribes `DATABASE_URL` manualmente, URL-encodea los caracteres reservados de usuario/contraseña; Railway recomienda usar la referencia privada `MYSQL_URL` dentro del mismo proyecto en vez del endpoint público.
+
 ## Solución de problemas
 
 - `cannot connect to the Docker daemon`: inicie Docker Desktop; Compose está instalado pero el

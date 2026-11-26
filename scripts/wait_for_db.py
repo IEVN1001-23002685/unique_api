@@ -17,8 +17,14 @@ def ocultar_secretos(mensaje: str) -> str:
     return re.sub(r"(?i)password=[^&\s]+", "password=***", mensaje)
 
 
+def normalizar_database_url(url: str) -> str:
+    if url.startswith("mysql://"):
+        return "mysql+pymysql://" + url[len("mysql://") :]
+    return url
+
+
 def esperar_base_de_datos() -> int:
-    url = os.getenv("DATABASE_URL", "")
+    url = normalizar_database_url(os.getenv("DATABASE_URL", "").strip())
     if not url:
         print("DATABASE_URL no está definida", file=sys.stderr)
         return 1
