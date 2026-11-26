@@ -9,6 +9,7 @@ class RegistroSchema(Schema):
     correo = fields.Email(required=True, validate=validate.Length(max=120))
     telefono = fields.Str(required=True, validate=validate.Regexp(r"^\d{10}$"))
     password = fields.Str(required=True, validate=validate.Length(min=8, max=128))
+    acepta_privacidad = fields.Bool(required=True, validate=validate.Equal(True))
     acepta_promociones = fields.Bool(load_default=False)
 
 
@@ -33,6 +34,7 @@ class UsuarioSchema(Schema):
     correo = fields.Email()
     telefono = fields.Str()
     estado_cuenta = fields.Str()
+    acepta_privacidad = fields.Bool()
     acepta_promociones = fields.Bool()
     rol = fields.Str(attribute="rol.codigo")
     creado_en = fields.DateTime(format="iso")
@@ -62,6 +64,8 @@ class CuentaActualizarSchema(Schema):
     nombre = fields.Str(validate=validate.Length(min=1, max=80))
     apellidos = fields.Str(validate=validate.Length(min=1, max=120))
     telefono = fields.Str(validate=validate.Regexp(r"^\d{10}$"))
+    correo = fields.Email(validate=validate.Length(max=120))
+    contrasena_actual = fields.Str(validate=validate.Length(min=1, max=128))
     acepta_promociones = fields.Bool()
 
 

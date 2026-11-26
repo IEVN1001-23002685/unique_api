@@ -15,13 +15,29 @@ def perfil():
 
 
 def actualizar_perfil(datos: dict, ip=None):
-    permitidos = ("nombre", "apellidos", "telefono", "acepta_promociones")
+    usuario = usuario_actual()
+    permitidos = ("nombre", "apellidos", "telefono", "correo", "acepta_promociones")
     cambios = {clave: valor for clave, valor in datos.items() if clave in permitidos}
     if not cambios:
         raise ApiError("VALIDACION", "Se requiere al menos un campo", 400)
+    if "correo" in cambios:
+        contrasena_actual = datos.get("contrasena_actual")
+        if not contrasena_actual:
+            raise ApiError(
+                "VALIDACION", "Se requiere la contraseña actual para cambiar el correo", 400
+            )
+        if not verificar_password(usuario.password_hash or "", contrasena_actual):
+            raise ApiError("CONTRASENA_INVALIDA", "La contraseña actual no es correcta", 401)
     return usuario_service.actualizar_usuario(
-        usuario_actual().id, cambios, ip=ip, actor_id=usuario_actual().id
+        usuario.id, cambios, ip=ip, actor_id=usuario.id
     )
+
+
+def desactivar_cuenta(ip=None) -> None:
+    usuario = usuario_actual()
+    if usuario.estado_cuenta != "ACTIVA":
+        raise ApiError("ESTADO_NO_PERMITIDO", "Solo se puede desactivar una cuenta activa", 409)
+    usuario_service.desactivar_usuario(usuario.id, ip=ip, actor_id=usuario.id)
 
 
 def cambiar_contrasena(contrasena_actual: str, contrasena_nueva: str, ip=None) -> None:

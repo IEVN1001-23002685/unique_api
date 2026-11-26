@@ -40,6 +40,13 @@ def actualizar_cuenta():
     return jsonify(UsuarioSchema().dump(usuario))
 
 
+@cuenta_bp.patch("/cuenta/desactivar")
+@autenticacion_requerida
+def desactivar_cuenta():
+    cuenta_service.desactivar_cuenta(ip=request.remote_addr)
+    return jsonify({"mensaje": "Cuenta desactivada"})
+
+
 @cuenta_bp.patch("/cuenta/contrasena")
 @autenticacion_requerida
 def cambiar_contrasena():

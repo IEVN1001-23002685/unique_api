@@ -243,12 +243,12 @@ def logistica(app, client, tienda, headers_admin, headers_operativo):
             )
         if lotes:
             db.session.execute(text("SET @permite_borrar_movimiento=1"))
-                db.session.execute(
+            db.session.execute(
                 text("DELETE FROM movimiento_material WHERE lote_id IN :ids").bindparams(
                     db.bindparam("ids", lotes, expanding=True)
-                db.session.execute(text("SET @permite_borrar_movimiento=0"))
                 )
             )
+            db.session.execute(text("SET @permite_borrar_movimiento=0"))
             db.session.execute(
                 text("DELETE FROM lote_material WHERE id IN :ids").bindparams(
                     db.bindparam("ids", lotes, expanding=True)

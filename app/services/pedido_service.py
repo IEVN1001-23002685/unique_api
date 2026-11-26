@@ -16,6 +16,7 @@ from app.models import (
     Pedido,
     PedidoEvento,
     PedidoLinea,
+    ProductoImagen,
     Preparacion,
     PreparacionLinea,
     ProduccionPedido,
@@ -144,6 +145,21 @@ def pedido_de_usuario(pedido_id: int, usuario_id: int) -> Pedido:
     return pedido
 
 
+def _imagenes_productos(producto_ids) -> dict:
+    """Primera imagen de cada producto, en el mismo orden que el catálogo."""
+    if not producto_ids:
+        return {}
+    filas = db.session.execute(
+        select(ProductoImagen.producto_id, ProductoImagen.url)
+        .where(ProductoImagen.producto_id.in_(producto_ids))
+        .order_by(ProductoImagen.producto_id, ProductoImagen.orden, ProductoImagen.id)
+    ).all()
+    imagenes = {}
+    for producto_id, url in filas:
+        imagenes.setdefault(producto_id, url)
+    return imagenes
+
+
 def _lineas(pedido_id: int) -> list:
     filas = db.session.execute(
         select(PedidoLinea, VentaLinea, VarianteProducto)
@@ -152,6 +168,7 @@ def _lineas(pedido_id: int) -> list:
         .where(PedidoLinea.pedido_id == pedido_id)
         .order_by(PedidoLinea.id)
     ).all()
+    imagenes = _imagenes_productos({variante.producto_id for _, _, variante in filas})
     return [
         {
             "id": pedido_linea.id,
@@ -167,9 +184,18 @@ def _lineas(pedido_id: int) -> list:
             "cant_pendiente": pedido_linea.cant_pendiente,
             "precio_unitario": venta_linea.precio_unitario,
             "subtotal": venta_linea.subtotal,
+            "imagen": imagenes.get(_variante.producto_id),
         }
         for pedido_linea, venta_linea, _variante in filas
     ]
+
+
+def _fecha_entrega(pedido_id: int):
+    return db.session.execute(
+        select(Entrega.resultado_en)
+        .where(Entrega.pedido_id == pedido_id, Entrega.estado == "ENTREGADA")
+        .order_by(Entrega.intento.desc())
+    ).scalars().first()
 
 
 def _envio(pedido_id: int):
@@ -233,18 +259,23 @@ def listar_propios(usuario_id: int, filtro: str, pagina: int, por_pagina: int) -
             .order_by(Entrega.intento.desc())
         ).scalars().all():
             guias.setdefault(entrega.pedido_id, entrega.folio)
-    items = [
-        {
-            "id": pedido.id,
-            "folio": venta.folio,
-            "fecha": venta.fecha,
-            "estado": pedido.estado,
-            "total": venta.total,
-            "articulos": sum(linea["cantidad"] for linea in _lineas(pedido.id)),
-            "guia": guias.get(pedido.id),
-        }
-        for pedido, venta in pedidos
-    ]
+    items = []
+    for pedido, venta in pedidos:
+        lineas = _lineas(pedido.id)
+        items.append(
+            {
+                "id": pedido.id,
+                "folio": venta.folio,
+                "fecha": venta.fecha,
+                "estado": pedido.estado,
+                "total": venta.total,
+                "articulos": sum(linea["cantidad"] for linea in lineas),
+                "guia": guias.get(pedido.id),
+                "imagen": lineas[0]["imagen"] if lineas else None,
+                "fecha_estimada": pedido.fecha_promesa,
+                "fecha_entrega": _fecha_entrega(pedido.id),
+            }
+        )
     return {
         "items": items,
         "total": total or 0,
@@ -266,6 +297,7 @@ def _detalle(pedido, solo_cliente=True) -> dict:
         consulta_eventos.order_by(PedidoEvento.fecha, PedidoEvento.id)
     ).scalars().all()
     envio = _envio(pedido.id)
+    lineas = _lineas(pedido.id)
     respuesta = {
         "id": pedido.id,
         "folio": venta.folio,
@@ -273,6 +305,9 @@ def _detalle(pedido, solo_cliente=True) -> dict:
         "estado": pedido.estado,
         "estado_desde": pedido.estado_desde,
         "fecha_promesa": pedido.fecha_promesa,
+        "fecha_estimada": pedido.fecha_promesa,
+        "fecha_entrega": _fecha_entrega(pedido.id),
+        "total_articulos": sum(linea["cantidad"] for linea in lineas),
         "prioridad": pedido.prioridad,
         "estado_pago": venta.estado_pago,
         "subtotal": venta.subtotal,
@@ -280,7 +315,7 @@ def _detalle(pedido, solo_cliente=True) -> dict:
         "costo_envio": venta.costo_envio,
         "total": venta.total,
         "direccion": _direccion_envio(venta.id),
-        "articulos": _lineas(pedido.id),
+        "articulos": lineas,
         "eventos": [
             {
                 "estado": evento.estado,

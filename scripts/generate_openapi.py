@@ -24,6 +24,41 @@ ROLES = {
     "catalogo.detalle_producto": "Público",
 }
 
+# Contratos corregidos durante la auditoría de integración. Se aplican además del
+# esqueleto generado desde las rutas para que `docs/openapi.json` no pierda los
+# campos reales cuando se regenera.
+DETALLES = {
+    ("/api/v1/auth/registro", "post"): {
+        "request": {"$ref": "#/components/schemas/RegistroEntrada"},
+        "responses": {"201": {"$ref": "#/components/responses/SesionCreada"}},
+    },
+    ("/api/v1/auth/login", "post"): {
+        "responses": {"200": {"$ref": "#/components/responses/Sesion"}},
+    },
+    ("/api/v1/auth/refrescar", "post"): {
+        "responses": {"200": {"$ref": "#/components/responses/Sesion"}},
+    },
+    ("/api/v1/cuenta", "patch"): {
+        "request": {"$ref": "#/components/schemas/CuentaActualizar"},
+    },
+    ("/api/v1/cuenta/contrasena", "patch"): {
+        "request": {"$ref": "#/components/schemas/ContrasenaCambiar"},
+        "responses": {"200": {"$ref": "#/components/responses/Mensaje"}},
+    },
+    ("/api/v1/cuenta/desactivar", "patch"): {
+        "responses": {"200": {"$ref": "#/components/responses/Mensaje"}},
+    },
+    ("/api/v1/mis-pedidos", "get"): {
+        "responses": {"200": {"$ref": "#/components/responses/PedidosLista"}},
+    },
+    ("/api/v1/mis-pedidos/{pedido_id}", "get"): {
+        "responses": {"200": {"$ref": "#/components/responses/PedidoDetalle"}},
+    },
+    ("/api/v1/mis-pedidos/{pedido_id}/comprobante", "get"): {
+        "responses": {"200": {"$ref": "#/components/responses/Comprobante"}},
+    },
+}
+
 TAG_MAP = {
     "health": "Salud",
     "auth": "M01 Auth",
@@ -136,6 +171,15 @@ def build_spec():
                 op["security"] = [{"bearerAuth": []}]
             else:
                 op["security"] = []
+            detalle = DETALLES.get((openapi_path, method.lower()))
+            if detalle:
+                if "request" in detalle:
+                    op["requestBody"] = {
+                        "required": method in {"POST", "PUT", "PATCH"},
+                        "content": {"application/json": {"schema": detalle["request"]}},
+                    }
+                if "responses" in detalle:
+                    op["responses"].update(detalle["responses"])
             path_item[method.lower()] = op
 
     spec = {
@@ -171,6 +215,127 @@ def build_spec():
                         "por_pagina": {"type": "integer"},
                     },
                 },
+                "Mensaje": {
+                    "type": "object",
+                    "properties": {"mensaje": {"type": "string"}},
+                },
+                "Usuario": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "nombre": {"type": "string"},
+                        "apellidos": {"type": "string"},
+                        "correo": {"type": "string", "format": "email"},
+                        "telefono": {"type": "string"},
+                        "estado_cuenta": {"type": "string"},
+                        "acepta_privacidad": {"type": "boolean"},
+                        "acepta_promociones": {"type": "boolean"},
+                        "rol": {"type": "string"},
+                    },
+                },
+                "RegistroEntrada": {
+                    "type": "object",
+                    "required": ["nombre", "apellidos", "correo", "telefono", "password", "acepta_privacidad"],
+                    "properties": {
+                        "nombre": {"type": "string"},
+                        "apellidos": {"type": "string"},
+                        "correo": {"type": "string", "format": "email"},
+                        "telefono": {"type": "string", "pattern": "^\\d{10}$"},
+                        "password": {"type": "string", "minLength": 8},
+                        "acepta_privacidad": {"type": "boolean", "enum": [True]},
+                        "acepta_promociones": {"type": "boolean"},
+                    },
+                },
+                "Sesion": {
+                    "type": "object",
+                    "properties": {
+                        "access_token": {"type": "string"},
+                        "usuario": {"$ref": "#/components/schemas/Usuario"},
+                    },
+                },
+                "CuentaActualizar": {
+                    "type": "object",
+                    "properties": {
+                        "nombre": {"type": "string"},
+                        "apellidos": {"type": "string"},
+                        "telefono": {"type": "string"},
+                        "correo": {"type": "string", "format": "email"},
+                        "contrasena_actual": {"type": "string", "description": "Obligatoria si se envía correo"},
+                        "acepta_promociones": {"type": "boolean"},
+                    },
+                },
+                "ContrasenaCambiar": {
+                    "type": "object",
+                    "required": ["contrasena_actual", "contrasena_nueva"],
+                    "properties": {
+                        "contrasena_actual": {"type": "string"},
+                        "contrasena_nueva": {"type": "string", "minLength": 8},
+                    },
+                },
+                "PedidoLinea": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "venta_linea_id": {"type": "integer"},
+                        "variante_id": {"type": "integer"},
+                        "producto_id": {"type": "integer"},
+                        "sku": {"type": "string"},
+                        "nombre_producto": {"type": "string"},
+                        "cantidad": {"type": "integer"},
+                        "precio_unitario": {"type": "string"},
+                        "subtotal": {"type": "string"},
+                        "imagen": {"type": "string", "nullable": True},
+                    },
+                },
+                "PedidoLista": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "folio": {"type": "string"},
+                        "fecha": {"type": "string", "format": "date-time"},
+                        "estado": {"type": "string"},
+                        "total": {"type": "string"},
+                        "articulos": {"type": "integer"},
+                        "guia": {"type": "string", "nullable": True},
+                        "imagen": {"type": "string", "nullable": True},
+                        "fecha_estimada": {"type": "string", "format": "date", "nullable": True},
+                        "fecha_entrega": {"type": "string", "format": "date-time", "nullable": True},
+                    },
+                },
+                "PedidoDetalle": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "folio": {"type": "string"},
+                        "fecha": {"type": "string", "format": "date-time"},
+                        "estado": {"type": "string"},
+                        "fecha_promesa": {"type": "string", "format": "date", "nullable": True},
+                        "fecha_estimada": {"type": "string", "format": "date", "nullable": True},
+                        "fecha_entrega": {"type": "string", "format": "date-time", "nullable": True},
+                        "total_articulos": {"type": "integer"},
+                        "total": {"type": "string"},
+                        "direccion": {"type": "object", "nullable": True},
+                        "articulos": {"type": "array", "items": {"$ref": "#/components/schemas/PedidoLinea"}},
+                        "eventos": {"type": "array", "items": {"type": "object"}},
+                        "guia": {"type": "string", "nullable": True},
+                        "repartidor": {"type": "object", "nullable": True},
+                    },
+                },
+                "Comprobante": {
+                    "type": "object",
+                    "properties": {
+                        "folio": {"type": "string"},
+                        "fecha": {"type": "string", "format": "date-time"},
+                        "estado_pago": {"type": "string"},
+                        "cliente": {"type": "object"},
+                        "direccion": {"type": "object", "nullable": True},
+                        "lineas": {"type": "array", "items": {"$ref": "#/components/schemas/PedidoLinea"}},
+                        "subtotal": {"type": "string"},
+                        "descuento_monto": {"type": "string"},
+                        "costo_envio": {"type": "string"},
+                        "total": {"type": "string"},
+                    },
+                },
             },
             "responses": {
                 "BadRequest": {"description": "Petición inválida", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
@@ -181,6 +346,12 @@ def build_spec():
                 "Unprocessable": {"description": "Regla de negocio", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
                 "TooManyRequests": {"description": "Demasiados intentos", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
                 "InternalError": {"description": "Error interno", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+                "Mensaje": {"description": "Operación correcta", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Mensaje"}}}},
+                "Sesion": {"description": "Sesión iniciada o refrescada", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Sesion"}}}},
+                "SesionCreada": {"description": "Cuenta creada", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Sesion"}}}},
+                "PedidosLista": {"description": "Lista paginada", "content": {"application/json": {"schema": {"type": "object", "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/PedidoLista"}}, "total": {"type": "integer"}, "pagina": {"type": "integer"}, "por_pagina": {"type": "integer"}}}}}},
+                "PedidoDetalle": {"description": "Detalle del pedido", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PedidoDetalle"}}}},
+                "Comprobante": {"description": "Comprobante JSON (no PDF)", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Comprobante"}}}},
             },
         },
     }

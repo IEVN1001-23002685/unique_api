@@ -71,6 +71,7 @@ def registrar_cliente(datos: dict, ip=None):
         password_hash=generar_hash(datos["password"]),
         estado_cuenta="ACTIVA",
         intentos_fallidos=0,
+        acepta_privacidad=datos["acepta_privacidad"],
         acepta_promociones=datos.get("acepta_promociones", False),
     )
     db.session.add(usuario)

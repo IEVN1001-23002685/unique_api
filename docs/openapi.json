@@ -407,7 +407,7 @@
             "description": "Recurso creado"
           },
           "200": {
-            "description": "Operación correcta"
+            "$ref": "#/components/responses/Sesion"
           }
         },
         "requestBody": {
@@ -591,7 +591,7 @@
             "description": "Recurso creado"
           },
           "200": {
-            "description": "Operación correcta"
+            "$ref": "#/components/responses/Sesion"
           }
         },
         "requestBody": {
@@ -648,25 +648,18 @@
             "$ref": "#/components/responses/InternalError"
           },
           "201": {
-            "description": "Recurso creado"
+            "$ref": "#/components/responses/SesionCreada"
           },
           "200": {
             "description": "Operación correcta"
           }
         },
         "requestBody": {
-          "required": false,
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              }
-            },
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
+                "$ref": "#/components/schemas/RegistroEntrada"
               }
             }
           }
@@ -2007,18 +2000,11 @@
           }
         },
         "requestBody": {
-          "required": false,
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              }
-            },
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
+                "$ref": "#/components/schemas/CuentaActualizar"
               }
             }
           }
@@ -2064,7 +2050,61 @@
             "$ref": "#/components/responses/InternalError"
           },
           "200": {
-            "description": "Operación correcta"
+            "$ref": "#/components/responses/Mensaje"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContrasenaCambiar"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/cuenta/desactivar": {
+      "patch": {
+        "tags": [
+          "M02 Cuenta"
+        ],
+        "operationId": "patch_cuenta_desactivar_cuenta",
+        "summary": "Cuenta Desactivar Cuenta",
+        "description": "Contrato detallado en docs/endpoints.md. Rol/seguridad: ver docs/endpoints.md.",
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "200": {
+            "$ref": "#/components/responses/Mensaje"
           }
         },
         "requestBody": {
@@ -3793,6 +3833,50 @@
         ]
       }
     },
+    "/api/v1/docs": {
+      "get": {
+        "tags": [
+          "Salud"
+        ],
+        "operationId": "get_health_swagger_ui",
+        "summary": "Health Swagger Ui",
+        "description": "Contrato detallado en docs/endpoints.md. Rol/seguridad: ver docs/endpoints.md.",
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "200": {
+            "description": "Operación correcta"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/v1/entregas": {
       "post": {
         "tags": [
@@ -5340,7 +5424,7 @@
             "$ref": "#/components/responses/InternalError"
           },
           "200": {
-            "description": "Operación correcta"
+            "$ref": "#/components/responses/PedidosLista"
           }
         },
         "security": [
@@ -5384,7 +5468,7 @@
             "$ref": "#/components/responses/InternalError"
           },
           "200": {
-            "description": "Operación correcta"
+            "$ref": "#/components/responses/PedidoDetalle"
           }
         },
         "parameters": [
@@ -5512,7 +5596,7 @@
             "$ref": "#/components/responses/InternalError"
           },
           "200": {
-            "description": "Operación correcta"
+            "$ref": "#/components/responses/Comprobante"
           }
         },
         "parameters": [
@@ -5525,6 +5609,50 @@
             }
           }
         ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/openapi.json": {
+      "get": {
+        "tags": [
+          "Salud"
+        ],
+        "operationId": "get_health_openapi_json",
+        "summary": "Health Openapi Json",
+        "description": "Contrato detallado en docs/endpoints.md. Rol/seguridad: ver docs/endpoints.md.",
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "200": {
+            "description": "Operación correcta"
+          }
+        },
         "security": [
           {
             "bearerAuth": []
@@ -10346,6 +10474,320 @@
             "type": "integer"
           }
         }
+      },
+      "Mensaje": {
+        "type": "object",
+        "properties": {
+          "mensaje": {
+            "type": "string"
+          }
+        }
+      },
+      "Usuario": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "apellidos": {
+            "type": "string"
+          },
+          "correo": {
+            "type": "string",
+            "format": "email"
+          },
+          "telefono": {
+            "type": "string"
+          },
+          "estado_cuenta": {
+            "type": "string"
+          },
+          "acepta_privacidad": {
+            "type": "boolean"
+          },
+          "acepta_promociones": {
+            "type": "boolean"
+          },
+          "rol": {
+            "type": "string"
+          }
+        }
+      },
+      "RegistroEntrada": {
+        "type": "object",
+        "required": [
+          "nombre",
+          "apellidos",
+          "correo",
+          "telefono",
+          "password",
+          "acepta_privacidad"
+        ],
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "apellidos": {
+            "type": "string"
+          },
+          "correo": {
+            "type": "string",
+            "format": "email"
+          },
+          "telefono": {
+            "type": "string",
+            "pattern": "^\\d{10}$"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8
+          },
+          "acepta_privacidad": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "acepta_promociones": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Sesion": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "usuario": {
+            "$ref": "#/components/schemas/Usuario"
+          }
+        }
+      },
+      "CuentaActualizar": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "apellidos": {
+            "type": "string"
+          },
+          "telefono": {
+            "type": "string"
+          },
+          "correo": {
+            "type": "string",
+            "format": "email"
+          },
+          "contrasena_actual": {
+            "type": "string",
+            "description": "Obligatoria si se envía correo"
+          },
+          "acepta_promociones": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ContrasenaCambiar": {
+        "type": "object",
+        "required": [
+          "contrasena_actual",
+          "contrasena_nueva"
+        ],
+        "properties": {
+          "contrasena_actual": {
+            "type": "string"
+          },
+          "contrasena_nueva": {
+            "type": "string",
+            "minLength": 8
+          }
+        }
+      },
+      "PedidoLinea": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "venta_linea_id": {
+            "type": "integer"
+          },
+          "variante_id": {
+            "type": "integer"
+          },
+          "producto_id": {
+            "type": "integer"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "nombre_producto": {
+            "type": "string"
+          },
+          "cantidad": {
+            "type": "integer"
+          },
+          "precio_unitario": {
+            "type": "string"
+          },
+          "subtotal": {
+            "type": "string"
+          },
+          "imagen": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PedidoLista": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "folio": {
+            "type": "string"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "estado": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string"
+          },
+          "articulos": {
+            "type": "integer"
+          },
+          "guia": {
+            "type": "string",
+            "nullable": true
+          },
+          "imagen": {
+            "type": "string",
+            "nullable": true
+          },
+          "fecha_estimada": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "fecha_entrega": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "PedidoDetalle": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "folio": {
+            "type": "string"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "estado": {
+            "type": "string"
+          },
+          "fecha_promesa": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "fecha_estimada": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "fecha_entrega": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "total_articulos": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "string"
+          },
+          "direccion": {
+            "type": "object",
+            "nullable": true
+          },
+          "articulos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PedidoLinea"
+            }
+          },
+          "eventos": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "guia": {
+            "type": "string",
+            "nullable": true
+          },
+          "repartidor": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      },
+      "Comprobante": {
+        "type": "object",
+        "properties": {
+          "folio": {
+            "type": "string"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "estado_pago": {
+            "type": "string"
+          },
+          "cliente": {
+            "type": "object"
+          },
+          "direccion": {
+            "type": "object",
+            "nullable": true
+          },
+          "lineas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PedidoLinea"
+            }
+          },
+          "subtotal": {
+            "type": "string"
+          },
+          "descuento_monto": {
+            "type": "string"
+          },
+          "costo_envio": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string"
+          }
+        }
       }
     },
     "responses": {
@@ -10425,6 +10867,83 @@
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Mensaje": {
+        "description": "Operación correcta",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Mensaje"
+            }
+          }
+        }
+      },
+      "Sesion": {
+        "description": "Sesión iniciada o refrescada",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Sesion"
+            }
+          }
+        }
+      },
+      "SesionCreada": {
+        "description": "Cuenta creada",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Sesion"
+            }
+          }
+        }
+      },
+      "PedidosLista": {
+        "description": "Lista paginada",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PedidoLista"
+                  }
+                },
+                "total": {
+                  "type": "integer"
+                },
+                "pagina": {
+                  "type": "integer"
+                },
+                "por_pagina": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "PedidoDetalle": {
+        "description": "Detalle del pedido",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/PedidoDetalle"
+            }
+          }
+        }
+      },
+      "Comprobante": {
+        "description": "Comprobante JSON (no PDF)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Comprobante"
             }
           }
         }

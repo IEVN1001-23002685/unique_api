@@ -35,6 +35,7 @@ class Usuario(ModeloBase):
     intentos_fallidos = db.Column(db.Integer, nullable=False, default=0)
     bloqueado_hasta = db.Column(db.DateTime, nullable=True)
     ultimo_acceso = db.Column(db.DateTime, nullable=True)
+    acepta_privacidad = db.Column(db.Boolean, nullable=False, default=False)
     acepta_promociones = db.Column(db.Boolean, nullable=False, default=False)
 
     rol = db.relationship("Rol", foreign_keys=[rol_id])

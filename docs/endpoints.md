@@ -43,7 +43,7 @@ Ejecuta `SELECT 1`. No expone SQL, host, credenciales ni trazas.
 
 | Método | Ruta | Rol | Cuerpo | Respuesta |
 |---|---|---|---|---|
-| `POST` | `/auth/registro` | P | `nombre`, `apellidos`, `correo`, `telefono`, `password`, `acepta_promociones` | `201`, `{ access_token, usuario }` + cookie de refresco; crea `CLIENTE` |
+| `POST` | `/auth/registro` | P | `nombre`, `apellidos`, `correo`, `telefono`, `password`, `acepta_privacidad` (**obligatorio, `true`**), opcional `acepta_promociones` | `201`, `{ access_token, usuario }` + cookie de refresco; crea `CLIENTE` |
 | `POST` | `/auth/login` | P | `correo`, `password` | `200`, `{ access_token, usuario }` + cookie de refresco |
 | `POST` | `/auth/refrescar` | P | Cookie `refresh_token_cookie` | `200`, nuevo `access_token` y rotación de cookie |
 | `POST` | `/auth/logout` | autenticado | Cookie de refresco; cabecera Bearer | `200`, revoca el refresco |
@@ -55,16 +55,23 @@ Errores habituales: `400 VALIDACION`, `401 CREDENCIALES_INVALIDAS`/`SESION_INVAL
 
 - Rate limit de login: 5 intentos por minuto por IP y por correo.
 - Access token: 15 minutos en `Authorization: Bearer`.
-- Refresh token: 7 días en cookie `httpOnly`, `SameSite=Strict`, `Secure` en producción.
+- Refresh token: 7 días en cookie `httpOnly`; `JWT_COOKIE_SAMESITE` es configurable (`Strict`
+  por defecto) y `Secure` en producción. Si se usa `SameSite=None`, la configuración exige
+  `JWT_COOKIE_SECURE=true` y `JWT_COOKIE_CSRF_PROTECT=true`; el frontend envía entonces
+  `X-CSRF-TOKEN` desde la cookie `csrf_refresh_token` al refrescar; las rutas protegidas usan el access token en `Authorization`.
 - La misma clave de refresco solo sirve una vez; al usarla se emite una nueva y la anterior queda revocada.
+- El frontend serializa los refrescos (`single-flight`): una sola petición `/auth/refrescar`
+  por lote de 401 y cabecera `X-Auth-Refresco-Intentado` para no repetir indefinidamente. Si el
+  refresco falla, se limpia la sesión local.
 
 ## M02 — Cuenta y envío
 
 | Método | Ruta | Rol | Cuerpo / parámetros | Respuesta |
 |---|---|---|---|---|
 | `GET` | `/cuenta` | autenticado | — | Perfil del usuario autenticado (`200`) |
-| `PATCH` | `/cuenta` | autenticado | `nombre`, `apellidos`, `telefono`, `acepta_promociones` | Perfil actualizado (`200`) |
+| `PATCH` | `/cuenta` | autenticado | `nombre`, `apellidos`, `telefono`, `acepta_promociones`; para cambiar `correo` se requiere además `contrasena_actual` | Perfil actualizado (`200`) |
 | `PATCH` | `/cuenta/contrasena` | autenticado | `contrasena_actual`, `contrasena_nueva` | `200`; revoca refresh tokens |
+| `PATCH` | `/cuenta/desactivar` | autenticado | — | `200`; baja explícita de la cuenta, revoca refresh tokens y registra bitácora |
 | `GET` | `/cuenta/direcciones` | C | — | Lista de direcciones activas propias (`200`) |
 | `POST` | `/cuenta/direcciones` | C | `tipo`, `alias`, `destinatario`, `telefono`, `calle`, `numero_ext`, `colonia`, `municipio`, `estado`, `codigo_postal`, opcionales `numero_int`, `referencia`, `rfc`, `razon_social`, `predeterminada` | `201` |
 | `PATCH` | `/cuenta/direcciones/{id}` | C | Campos parciales de dirección | `200` |
@@ -75,8 +82,10 @@ Errores habituales: `400 VALIDACION`, `401 CREDENCIALES_INVALIDAS`/`SESION_INVAL
 | `DELETE` | `/cuenta/medios-pago/{id}` | C | — | `204`; borrado lógico |
 | `GET` | `/envio/cobertura?cp=` | P | `cp` de 5 dígitos | `200` con `cobertura`, `tarifa`, `costo` y `dias_estimados` |
 
-Errores: `400 VALIDACION`, `400 CODIGO_POSTAL_INVALIDO`, `401 NO_AUTENTICADO`,
-`403 PERMISO_INSUFICIENTE`, `404 DIRECCION_NO_ENCONTRADA`/`MEDIO_PAGO_NO_ENCONTRADO`,
+Errores: `400 VALIDACION`, `400 CODIGO_POSTAL_INVALIDO`, `401 NO_AUTENTICADO`/
+`CONTRASENA_INVALIDA`, `403 PERMISO_INSUFICIENTE`,
+`404 DIRECCION_NO_ENCONTRADA`/`MEDIO_PAGO_NO_ENCONTRADO`,
+`409 CORREO_REGISTRADO`/`ESTADO_NO_PERMITIDO`,
 `422 DATOS_FACTURACION_INCOMPLETOS`, `422 TARJETA_INVALIDA`/`TARJETA_VENCIDA`/`CVV_INVALIDO`.
 
 Una sola dirección predeterminada por `tipo` por usuario. Las consultas siempre filtran por
@@ -92,6 +101,9 @@ el usuario autenticado; un `usuario_id` enviado por el navegador se ignora.
 Cada variante expone `disponibilidad` (`Disponible`, `Pocas unidades`, `Bajo pedido`,
 `Agotado`), `bajo_pedido`, `fecha_estimada` y `comprable`. Nunca se exponen existencias
 exactas ni reservas. El catálogo no incluye costos, precios de compra ni márgenes.
+`disponibles=true` filtra variantes activas con existencia libre (`existencia > reservado`):
+incluye `Disponible` y `Pocas unidades`, excluye `Bajo pedido` y `Agotado`. El modo local
+del frontend aplica el mismo criterio.
 
 ## M04 — Carrito
 
@@ -113,6 +125,9 @@ variantes activas y existencia; una línea no comprable se marca `comprable=fals
 | `POST` | `/checkout/cotizar` | C | `codigo_postal` o `direccion_id`, `descuento_codigo`, opcional facturación | Subtotal, descuento, envío, total, fecha promesa y líneas (`200`) |
 | `POST` | `/checkout/descuento` | C | `codigo` | Descuento aplicable y ahorro (`200`) |
 | `POST` | `/checkout/pagar` | C | `direccion_id` o `direccion`, `metodo_pago`, medio guardado o datos de tarjeta, opcional `descuento_codigo` y facturación | `201` con venta, pedido y resumen |
+
+En `/checkout/pagar` el C.P. se toma de `direccion.codigo_postal` o de la dirección guardada:
+el cuerpo no acepta `codigo_postal` suelto (ese campo es exclusivo de `/checkout/cotizar`).
 
 `/checkout/pagar` exige la cabecera `Idempotency-Key`. La misma clave con el mismo cuerpo
 devuelve la respuesta original; con otro cuerpo responde `409 IDEMPOTENCIA_CONFLICTO`.
@@ -136,10 +151,19 @@ Errores: `400 IDEMPOTENCIA_REQUERIDA`, `409 IDEMPOTENCIA_CONFLICTO`, `409 STOCK_
 
 | Método | Ruta | Rol | Parámetros / cuerpo | Respuesta |
 |---|---|---|---|---|
-| `GET` | `/mis-pedidos` | C | `estado` (`TODOS`, `EN_PROCESO`, `ENVIADOS`, `ENTREGADOS`), `pagina`, `por_pagina` | Lista paginada propia (`200`) |
-| `GET` | `/mis-pedidos/{id}` | C | — | Detalle propio con artículos (`venta_linea_id`, `variante_id` y `producto_id` para solicitudes M07), eventos visibles, guía y repartidor (`200`) |
+| `GET` | `/mis-pedidos` | C | `estado` (`TODOS`, `EN_PROCESO`, `ENVIADOS`, `ENTREGADOS`), `pagina`, `por_pagina` | Lista paginada propia: `articulos`, `imagen`, `fecha_estimada` y `fecha_entrega` por pedido (`200`) |
+| `GET` | `/mis-pedidos/{id}` | C | — | Detalle propio: `total_articulos`, `fecha_estimada` (alias de `fecha_promesa`), `fecha_entrega`, artículos con `imagen` (`venta_linea_id`, `variante_id` y `producto_id` para M07), eventos visibles, guía y repartidor (`200`) |
 | `POST` | `/mis-pedidos/{id}/cancelar` | C | `motivo` | Pedido cancelado (`200`) |
-| `GET` | `/mis-pedidos/{id}/comprobante` | C | — | Comprobante histórico (`200`) |
+| `GET` | `/mis-pedidos/{id}/comprobante` | C | — | Comprobante histórico en JSON (`application/json`, `200`) |
+
+`fecha_estimada` sale de `pedido.fecha_promesa`; `fecha_entrega` de `entrega.resultado_en`
+cuando el último intento está `ENTREGADA`; ambas son `null` cuando aún no aplican. Las imágenes
+son la primera imagen del producto por `orden`, sin existencias ni rutas del servidor local.
+
+El comprobante es `ComprobanteSchema` (JSON: `folio`, `fecha`, `estado_pago`, `cliente`,
+`direccion`, `lineas`, `subtotal`, `descuento_monto`, `costo_envio` y `total`), no un PDF. El
+frontend convierte ese JSON en un `Blob` con `Content-Type: application/json` y deriva la
+extensión del tipo; no se genera un PDF simulado.
 
 La cancelación del cliente es válida en `RECIBIDO`, `CONFIRMADO` o `EN_PRODUCCION`: libera
 reservas con `LIBERA_RESERVA`, ajusta la orden de producción abierta, elimina la preparación

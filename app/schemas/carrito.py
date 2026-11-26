@@ -28,6 +28,7 @@ class CarritoLineaSchema(Schema):
     bajo_pedido = fields.Bool()
     fecha_estimada = fields.Date(allow_none=True)
     activa = fields.Bool()
+    comprable = fields.Bool()
     imagen = fields.Str(allow_none=True)
 
 

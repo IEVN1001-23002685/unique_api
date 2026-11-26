@@ -126,6 +126,8 @@ Railway no ejecuta `compose.yaml`; despliega servicios separados desde el `Docke
    - `DATABASE_URL=${{MySQL.MYSQL_URL}}`, sustituyendo `MySQL` por el nombre exacto del servicio de base de datos. Railway entrega `mysql://...`; la app y el script de espera lo normalizan a `mysql+pymysql://...`. Si la referencia no aplica, construye la URL como `mysql+pymysql://<usuario>:<contraseña-url-encoded>@<host-privado>:<puerto>/<base>?charset=utf8mb4`.
    - `CORS_ORIGINS=https://<dominio-frontend>` con el origen real, sin ruta final; para varios orígenes, sepáralos por comas.
    - `JWT_COOKIE_SECURE=true`
+   - `JWT_COOKIE_SAMESITE=Strict` (use `None` solo si Angular y la API están en sitios distintos; entonces añada `JWT_COOKIE_CSRF_PROTECT=true`)
+   - `JWT_COOKIE_CSRF_PROTECT=false` (o `true` con `SameSite=None`)
    - `TZ=America/Mexico_City`
    - `WEB_CONCURRENCY=1`
 3. Railway asigna `PORT`; el contenedor ya lo usa automáticamente. No fijes `APP_PORT` salvo pruebas locales.

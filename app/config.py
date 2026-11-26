@@ -22,6 +22,19 @@ def _secreto(nombre: str, app_env: str) -> str:
     return valor
 
 
+def _same_site(secure: bool, csrf_protegido: bool) -> str:
+    valor = os.getenv("JWT_COOKIE_SAMESITE", "Strict").strip()
+    normalizado = {"strict": "Strict", "lax": "Lax", "none": "None"}.get(valor.lower())
+    if normalizado is None:
+        raise RuntimeError("JWT_COOKIE_SAMESITE debe ser Strict, Lax o None")
+    if normalizado == "None" and (not secure or not csrf_protegido):
+        raise RuntimeError(
+            "JWT_COOKIE_SAMESITE=None requiere JWT_COOKIE_SECURE=true y "
+            "JWT_COOKIE_CSRF_PROTECT=true"
+        )
+    return normalizado
+
+
 def _database_uri() -> str:
     url = os.getenv("DATABASE_URL", "").strip()
     if url.startswith("mysql://"):
@@ -41,8 +54,8 @@ class Config:
     JWT_TOKEN_LOCATION = ["headers", "cookies"]
     JWT_COOKIE_SECURE = _booleano("JWT_COOKIE_SECURE", APP_ENV == "production")
     JWT_COOKIE_HTTPONLY = True
-    JWT_COOKIE_SAMESITE = "Strict"
     JWT_COOKIE_CSRF_PROTECT = _booleano("JWT_COOKIE_CSRF_PROTECT", False)
+    JWT_COOKIE_SAMESITE = _same_site(JWT_COOKIE_SECURE, JWT_COOKIE_CSRF_PROTECT)
 
     SQLALCHEMY_DATABASE_URI = _database_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False

@@ -1,5 +1,6 @@
 import os
 import secrets
+import tempfile
 from decimal import Decimal
 
 import pytest
@@ -28,7 +29,10 @@ from app.security.password import generar_hash
 def app():
     aplicacion = create_app()
     aplicacion.config.update(TESTING=True, DEBUG=False)
-    return aplicacion
+    # Las pruebas no deben depender de un directorio del sistema writable.
+    with tempfile.TemporaryDirectory(prefix="unique-test-uploads-") as directorio:
+        aplicacion.config["UPLOAD_FOLDER"] = directorio
+        yield aplicacion
 
 
 @pytest.fixture
@@ -80,6 +84,7 @@ def crear_usuario(app):
 
     yield _crear
 
+    # El historial (ventas, recetas, mermas...) conserva FKs al usuario; se desactiva en vez de borrarlo.
     with app.app_context():
         for usuario_id in creados:
             db.session.query(TokenRefresco).filter_by(usuario_id=usuario_id).delete()
@@ -87,7 +92,7 @@ def crear_usuario(app):
             db.session.query(Bitacora).filter_by(usuario_id=usuario_id).delete()
             usuario = db.session.get(Usuario, usuario_id)
             if usuario is not None:
-                db.session.delete(usuario)
+                usuario.estado_cuenta = "INACTIVA"
         db.session.commit()
 
 
@@ -402,7 +407,12 @@ def limpieza_fase3(app, mysql_disponible):
 
     with app.app_context():
         for sql, parametros in (*tareas, *finales):
-            db.session.execute(text(sql), parametros)
+            if "DELETE FROM movimiento_" in sql:
+                db.session.execute(text("SET @permite_borrar_movimiento=1"))
+                db.session.execute(text(sql), parametros)
+                db.session.execute(text("SET @permite_borrar_movimiento=0"))
+            else:
+                db.session.execute(text(sql), parametros)
         db.session.commit()
 
 

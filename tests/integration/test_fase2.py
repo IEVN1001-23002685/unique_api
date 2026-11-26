@@ -5,6 +5,7 @@ import secrets
 from sqlalchemy import text
 
 from app.extensions import db
+from app.models import ProductoImagen
 from tests.conftest import iniciar_sesion
 
 
@@ -136,6 +137,7 @@ def test_carrito_valida_cantidad_y_fusiona(client, tienda):
         json={"variante_id": producto["variante_id"], "cantidad": 2},
     )
     assert agregada.status_code == 200
+    assert agregada.get_json()["items"][0]["comprable"] is True
     fusion = client.post(
         "/api/v1/carrito/fusionar",
         headers=headers,
@@ -149,6 +151,30 @@ def test_carrito_valida_cantidad_y_fusiona(client, tienda):
     )
     assert borrada.status_code == 204
     assert client.get("/api/v1/carrito", headers=headers).get_json()["items"] == []
+
+
+def test_carrito_publica_comprable_por_disponibilidad(client, tienda):
+    disponible = tienda["crear_producto"](existencia=10)
+    bajo_pedido = tienda["crear_producto"](existencia=0, permite_bajo_pedido=True)
+    agotado = tienda["crear_producto"](existencia=0, permite_bajo_pedido=False)
+    usuario = tienda["crear_cliente"]()
+    headers = _headers(client, usuario)
+
+    for producto in (disponible, bajo_pedido, agotado):
+        respuesta = client.put(
+            "/api/v1/carrito/lineas",
+            headers=headers,
+            json={"variante_id": producto["variante_id"], "cantidad": 1},
+        )
+        assert respuesta.status_code == 200, respuesta.get_json()
+
+    carrito = client.get("/api/v1/carrito", headers=headers).get_json()
+    lineas = {linea["variante_id"]: linea for linea in carrito["items"]}
+    assert lineas[disponible["variante_id"]]["comprable"] is True
+    assert lineas[bajo_pedido["variante_id"]]["comprable"] is True
+    assert lineas[bajo_pedido["variante_id"]]["bajo_pedido"] is True
+    assert lineas[agotado["variante_id"]]["comprable"] is False
+    assert carrito["puede_pagar"] is False
 
 
 def test_checkout_idempotente_y_conflicto(app, client, tienda):
@@ -309,6 +335,57 @@ def test_cliente_no_consulta_pedidos_ajenos(client, tienda):
         json={"motivo": "Intento ajeno"},
     )
     assert cancelacion.status_code == 404
+
+
+def test_listado_y_detalle_de_pedido_incluyen_fechas_imagen_y_conteo(app, client, tienda):
+    producto = tienda["crear_producto"](existencia=2)
+    with app.app_context():
+        db.session.add(
+            ProductoImagen(
+                producto_id=producto["producto_id"],
+                url="/uploads/prueba.png",
+                orden=0,
+            )
+        )
+        db.session.commit()
+
+    usuario = tienda["crear_cliente"]()
+    headers = _headers(client, usuario)
+    client.put(
+        "/api/v1/carrito/lineas",
+        headers=headers,
+        json={"variante_id": producto["variante_id"], "cantidad": 2},
+    )
+    pago = client.post(
+        "/api/v1/checkout/pagar",
+        headers={**headers, "Idempotency-Key": _clave()},
+        json=_pago(),
+    )
+    assert pago.status_code == 201, pago.get_json()
+    pedido_id = pago.get_json()["pedido"]["id"]
+
+    listado = client.get("/api/v1/mis-pedidos", headers=headers)
+    assert listado.status_code == 200
+    item = listado.get_json()["items"][0]
+    assert item["articulos"] == 2
+    assert item["imagen"] == "/uploads/prueba.png"
+    assert "fecha_estimada" in item
+    assert "fecha_entrega" in item
+
+    detalle = client.get(f"/api/v1/mis-pedidos/{pedido_id}", headers=headers)
+    assert detalle.status_code == 200
+    cuerpo = detalle.get_json()
+    assert cuerpo["total_articulos"] == 2
+    assert cuerpo["fecha_estimada"] == cuerpo["fecha_promesa"]
+    assert "fecha_entrega" in cuerpo
+    assert cuerpo["articulos"][0]["imagen"] == "/uploads/prueba.png"
+
+    with app.app_context():
+        db.session.execute(
+            text("DELETE FROM producto_imagen WHERE producto_id = :id"),
+            {"id": producto["producto_id"]},
+        )
+        db.session.commit()
 
 
 def test_cancelacion_libera_reserva_y_reembolsa(app, client, tienda):

@@ -65,6 +65,7 @@ class PedidoLineaSchema(Schema):
     cant_pendiente = fields.Int()
     precio_unitario = fields.Decimal(as_string=True, places=2)
     subtotal = fields.Decimal(as_string=True, places=2)
+    imagen = fields.Str(allow_none=True)
 
 
 class PedidoEventoSchema(Schema):
@@ -82,6 +83,9 @@ class PedidoListaSchema(Schema):
     total = fields.Decimal(as_string=True, places=2)
     articulos = fields.Int()
     guia = fields.Str(allow_none=True)
+    imagen = fields.Str(allow_none=True)
+    fecha_estimada = fields.Date(allow_none=True)
+    fecha_entrega = fields.DateTime(format="iso", allow_none=True)
 
 
 class PedidoDetalleSchema(Schema):
@@ -91,6 +95,9 @@ class PedidoDetalleSchema(Schema):
     estado = fields.Str()
     estado_desde = fields.DateTime(format="iso")
     fecha_promesa = fields.Date(allow_none=True)
+    fecha_estimada = fields.Date(allow_none=True)
+    fecha_entrega = fields.DateTime(format="iso", allow_none=True)
+    total_articulos = fields.Int()
     prioridad = fields.Str()
     estado_pago = fields.Str()
     subtotal = fields.Decimal(as_string=True, places=2)
