@@ -575,14 +575,22 @@ duplicados si se escalan workers.
 - Dinero como cadena decimal con dos decimales; materiales hasta cuatro decimales.
 - Fechas ISO 8601 con zona horaria `TZ`.
 
-## Pendiente
+## OpenAPI / Swagger
 
-Los blueprints M01–M22 están documentados, incluyendo tareas programadas, dashboard y
-catálogos administrativos. Los documentos PDF se sirven como `application/pdf` y el
-exportable del dashboard como `text/csv; charset=utf-8`. La tabla completa de rutas
-requeridas está en la sección 11 del documento integral y en `AGENTS.md`.
+La especificación OpenAPI 3.0 se genera desde las rutas Flask registradas:
 
-Pendientes concretos, registrados también en `decisiones-tecnicas.md`:
+```bash
+docker compose exec api sh -c 'cd /app && PYTHONPATH=/app python scripts/generate_openapi.py'
+```
+
+- `GET /api/v1/openapi.json` — especificación OpenAPI.
+- `GET /api/v1/docs` — Swagger UI.
+
+El detalle funcional, reglas de negocio y ejemplos siguen en este documento.
+
+## Pendientes de negocio (no cerrados en Fase 7)
+
+Registrados también en `docs/decisiones-tecnicas.md`:
 
 - Cerrar órdenes de compra con faltante previa confirmación de `ADMIN`.
 - Exigir dos cotizaciones cuando exista proveedor alterno.

@@ -2,13 +2,10 @@
 
 Backend REST de UNIQUE (Flask + MySQL), construido según `UNIQUE_documento_integral_v3.txt`.
 
-**Estado actual: Fase 6 verificada.** La Fase 0 (infraestructura), la Fase 1 (modelo completo,
-migraciones, vistas, semillas, autenticación JWT y administración básica), la Fase 2 (cuenta,
-catálogo, carrito, checkout simulado y pedidos del cliente), la Fase 3 (productos, recetas,
-proveedores, compras y materia prima), la Fase 4 (producción y mermas), la Fase 5 (ventas,
-pedidos administrativos y devoluciones) y la Fase 6 (preparación, entregas, dashboard, alertas,
-catálogos administrativos y tareas programadas) están implementadas y probadas contra MySQL.
-La Fase 7 (cierre y revisión final) queda pendiente.
+**Estado actual: Fase 7 en cierre.** Se implementaron M01–M22, Docker, migraciones, semillas,
+pruebas contra MySQL y especificación OpenAPI/Swagger (`/api/v1/openapi.json`, `/api/v1/docs`).
+Quedan pendientes de negocio las reglas propuestas y decisiones marcadas en
+`docs/decisiones-tecnicas.md`.
 
 ## Requisitos
 
@@ -158,10 +155,20 @@ Notas: no instales phpMyAdmin dentro de la API. Si escalas a más de una réplic
 - Error de CORS: `CORS_ORIGINS` debe contener el origen Angular exacto, separado por comas si
   hay varios.
 
+## OpenAPI
+
+```bash
+docker compose exec api sh -c 'cd /app && PYTHONPATH=/app python scripts/generate_openapi.py'
+```
+
+- `GET /api/v1/openapi.json`
+- `GET /api/v1/docs`
+
 ## Detalles
 
 - Arquitectura: `docs/arquitectura.md`
 - Modelo de datos: `docs/modelo-datos.md`
 - Contrato HTTP: `docs/endpoints.md`
+- OpenAPI: `docs/openapi.json`
 - Decisiones técnicas: `docs/decisiones-tecnicas.md`
 - Despliegue: `docs/despliegue-docker.md`

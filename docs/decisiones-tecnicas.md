@@ -100,7 +100,7 @@ confirmación del equipo.
 | Dashboard para operativo | `/dashboard/produccion`, `/abastecimiento` y `/logistica` admiten `OPERATIVO`, pero el serializador omite costos, precios de compra, márgenes y utilidades. `/resumen`, `/ventas` y `/exportar` son solo `ADMIN`. | Implementado |
 | Universo de workers del scheduler | Supervisor levanta `api` (Gunicorn) y `scheduler` en el mismo contenedor. El scheduler adquiere `GET_LOCK('unique_scheduler', 5)` en MySQL antes de iniciar APScheduler, de modo que varias réplicas no dupliquen tareas. | Implementado |
 | JSON y PDF | `/dashboard/exportar` devuelve CSV (`text/csv; charset=utf-8`) con `Content-Disposition: attachment`. La etiqueta de preparación y la hoja de reparto devuelven PDF (`application/pdf`) con `Content-Disposition: inline`. | Documentado |
-| Especificación OpenAPI | `AGENTS.md` sección 10 la exige, pero el contrato publicado es `docs/endpoints.md` en Markdown. Por decisión del usuario se difiere a Fase 7; no se añade dependencia ni framework adicional en Fase 6. | Diferido a Fase 7 |
+| Especificación OpenAPI | Se genera `docs/openapi.json` con `scripts/generate_openapi.py` a partir de las rutas Flask registradas. La API expone `GET /api/v1/openapi.json` y `GET /api/v1/docs` (Swagger UI). `docs/endpoints.md` sigue siendo el contrato funcional detallado. | Implementado en Fase 7 |
 | Orígenes CORS para Angular | Se permiten `http://localhost:4200` y `http://127.0.0.1:4200` porque Angular puede resolverse con cualquiera de los dos nombres de host. `supports_credentials=True` ya estaba configurado para la cookie de refresco. | Implementado |
 
 ## Integración con el frontend Angular
