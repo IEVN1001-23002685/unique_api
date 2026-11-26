@@ -53,8 +53,8 @@ def lotes_peps(app, datos_fase3, limpieza_fase3):
         db.session.commit()
         ids = [antiguo.id, reciente.id]
 
-    limpieza_fase3("DELETE FROM movimiento_material WHERE lote_id IN :ids", {"ids": ids})
-    limpieza_fase3("DELETE FROM lote_material WHERE id IN :ids", {"ids": ids})
+    limpieza_fase3("SET @permite_borrar_movimiento=1"); limpieza_fase3("DELETE FROM movimiento_material WHERE lote_id IN :ids", {"ids": ids}); limpieza_fase3("SET @permite_borrar_movimiento=0")
+    limpieza_fase3("DELETE FROM lote_material WHERE id IN :ids", {"ids": ids}); limpieza_fase3("SET @permite_borrar_movimiento=0")
     return inventario_id, antiguo.id, reciente.id
 
 

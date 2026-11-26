@@ -594,7 +594,7 @@ Registrados también en `docs/decisiones-tecnicas.md`:
 
 - Cerrar órdenes de compra con faltante previa confirmación de `ADMIN`.
 - Exigir dos cotizaciones cuando exista proveedor alterno.
-- Restringir `UPDATE`/`DELETE` de tablas de movimientos con trigger o permisos de base de datos.
+- Endurecer permisos de BD para movimientos (los triggers ya bloquean `UPDATE`/`DELETE`; falta política de GRANT/roles de infraestructura según despliegue).
 - Confirmar reglas propuestas: `dias_devolucion`, `max_intentos_entrega`,
   `dias_produccion_estandar`, `max_piezas_por_linea`, `saldo_inicial_cuenta_simulada`,
   tarifa «Local León» y stock mínimo/reposición de variantes.

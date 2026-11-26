@@ -189,8 +189,8 @@ def datos_fase4(app, datos_fase3, limpieza_fase3, mysql_disponible):
         "OR lote_id IN :lotes",
         parametros,
     )
-    limpieza_fase3("DELETE FROM movimiento_producto WHERE variante_id = :vid", parametros)
-    limpieza_fase3("DELETE FROM movimiento_material WHERE lote_id IN :lotes", parametros)
+    limpieza_fase3("SET @permite_borrar_movimiento=1"); limpieza_fase3("DELETE FROM movimiento_producto WHERE variante_id = :vid", parametros)
+    limpieza_fase3("SET @permite_borrar_movimiento=1"); limpieza_fase3("DELETE FROM movimiento_material WHERE lote_id IN :lotes", parametros)
     limpieza_fase3("DELETE FROM lote_material WHERE id IN :lotes", parametros)
     limpieza_fase3.al_final(
         "DELETE FROM receta_linea WHERE receta_id = :receta", parametros

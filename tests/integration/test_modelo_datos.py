@@ -100,3 +100,39 @@ def test_sku_y_restricciones_de_stock(app, mysql_disponible):
             )
         ).scalar()
         assert engine == "InnoDB"
+
+
+def test_movimientos_son_inmutables(app, mysql_disponible):
+    with app.app_context():
+        uid = db.session.execute(text("SELECT id FROM usuario LIMIT 1")).scalar()
+        vid = db.session.execute(text("SELECT variante_id FROM stock_variante LIMIT 1")).scalar()
+        if not uid or not vid:
+            return
+        db.session.execute(
+            text(
+                "INSERT INTO movimiento_producto "
+                "(variante_id,tipo,delta_existencia,delta_reservado,documento_tipo,documento_id,usuario_id,fecha,creado_en,actualizado_en) "
+                "VALUES (:v,'AJUSTE',0,0,'TEST_INMUTABILIDAD',1,:u,NOW(),NOW(),NOW())"
+            ),
+            {"v": vid, "u": uid},
+        )
+        db.session.commit()
+        mid = db.session.execute(
+            text("SELECT id FROM movimiento_producto WHERE documento_tipo='TEST_INMUTABILIDAD' ORDER BY id DESC LIMIT 1")
+        ).scalar()
+
+        for sql in (
+            "UPDATE movimiento_producto SET motivo='x' WHERE id=:id",
+            "DELETE FROM movimiento_producto WHERE id=:id",
+        ):
+            try:
+                db.session.execute(text(sql), {"id": mid})
+                db.session.commit()
+                assert False, f"Se permitió operación prohibida: {sql}"
+            except Exception:
+                db.session.rollback()
+
+        db.session.execute(text("SET @permite_borrar_movimiento=1"))
+        db.session.execute(text("DELETE FROM movimiento_producto WHERE id=:id"), {"id": mid})
+        db.session.execute(text("SET @permite_borrar_movimiento=0"))
+        db.session.commit()

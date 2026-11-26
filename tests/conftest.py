@@ -311,11 +311,13 @@ def tienda(app, mysql_disponible):
             ))
 
         if variantes:
+            db.session.execute(text("SET @permite_borrar_movimiento=1"))
             db.session.execute(
                 text("DELETE FROM movimiento_producto WHERE variante_id IN :ids").bindparams(
                     db.bindparam("ids", variantes, expanding=True)
                 )
             )
+            db.session.execute(text("SET @permite_borrar_movimiento=0"))
             db.session.execute(
                 text(
                     "DELETE FROM alerta WHERE entidad_tipo = 'variante_producto' "

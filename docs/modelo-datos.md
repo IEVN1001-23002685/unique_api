@@ -65,9 +65,10 @@ definidos en Fase 1. Las relaciones que se apoyan en las reglas de negocio son:
 - `secuencia_folio` alimenta los folios `REQ`, `OC`, `REC` y `LT` dentro de la transacción que
   crea cada documento.
 
-`movimiento_producto` y `movimiento_material` son de solo inserción en la aplicación: no hay
-rutas de edición y las correcciones son movimientos inversos con motivo. La restricción a nivel
-de base de datos (trigger o `GRANT`) queda registrada como pendiente en `decisiones-tecnicas.md`.
+`movimiento_producto` y `movimiento_material` son inmutables: no hay rutas de edición y las
+correcciones son movimientos inversos con motivo. La migración `c4d5e6f7a8b9` añade triggers
+MySQL `BEFORE UPDATE/DELETE` que rechazan la mutación directa. Queda pendiente endurecer
+GRANT/roles de infraestructura según el entorno.
 
 ## Uso de tablas en Fase 4
 
@@ -135,6 +136,7 @@ Revisiones aplicadas:
 2. `7c1f9d2a4b60` — `Vistas de lectura del documento funcional`.
 3. `b2c3d4e5f6a7` — `Reversos de merma y vista neta` (columna `reversa_de_id` y ajuste de
    `v_merma_resumen`).
+4. `c4d5e6f7a8b9` — `Endurecer inmutabilidad de movimientos` (triggers `BEFORE UPDATE/DELETE`).
 
 Elaboración: `docker compose exec api flask db migrate -m "descripcion"`;
 aplicación: `docker compose exec api flask db upgrade`.
