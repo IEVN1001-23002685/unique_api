@@ -1,6 +1,6 @@
 """Esquemas de pedidos del cliente (M06) y administración (M09)."""
 
-from marshmallow import Schema, fields, validate
+from marshmallow import EXCLUDE, Schema, fields, validate
 
 ESTADOS_FILTRO = ["TODOS", "EN_PROCESO", "ENVIADOS", "ENTREGADOS"]
 ESTADOS_ADMIN = ESTADOS_FILTRO + [
@@ -23,10 +23,16 @@ class PedidoAdminFiltrosSchema(Schema):
     hasta = fields.DateTime(format="iso", allow_none=True)
     q = fields.Str(validate=validate.Length(max=120))
 
+    class Meta:
+        unknown = EXCLUDE
+
 
 class PendienteProduccionFiltrosSchema(Schema):
     semaforo = fields.Str(validate=validate.OneOf(SEMAFOROS))
     sku = fields.Str(validate=validate.Length(max=12))
+
+    class Meta:
+        unknown = EXCLUDE
 
 
 class PedidoAdminListaSchema(Schema):

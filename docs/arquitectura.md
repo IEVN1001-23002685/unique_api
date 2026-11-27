@@ -2,8 +2,10 @@
 
 ## Contenedores
 
-- `api`: `python:3.11-slim`, usuario no root (`uid 10001`), Supervisor con Gunicorn sin
-  `--reload` y un proceso `scheduler` único. Contiene todo el runtime Python: aplicación,
+- `api`: `python:3.11-slim`, Supervisor con Gunicorn sin `--reload` y un proceso
+  `scheduler` único. Supervisor arranca como root únicamente para abrir los pipes de logs
+  (`/dev/stdout`, `/dev/stderr`) y ajustar la propiedad del volumen; Gunicorn y el scheduler
+  bajan a `app` (`uid 10001`) con `gosu`. Contiene todo el runtime Python: aplicación,
   migraciones, tareas programadas y scripts.
 - `mysql`: `mysql:8.4.3`, volumen nombrado `mysql_data`.
 - `phpmyadmin`: `phpmyadmin:5.2.3`, conecta al servicio `mysql` por nombre de servicio.

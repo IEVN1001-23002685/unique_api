@@ -22,6 +22,7 @@ class VarianteDisponibilidadSchema(Schema):
     disponibilidad = fields.Str()
     bajo_pedido = fields.Bool()
     fecha_estimada = fields.Date(allow_none=True)
+    comprable = fields.Bool()
 
 
 class ProductoImagenSchema(Schema):

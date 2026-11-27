@@ -29,3 +29,15 @@ def test_cabeceras_de_seguridad(client):
     assert respuesta.headers["X-Content-Type-Options"] == "nosniff"
     assert respuesta.headers["X-Frame-Options"] == "DENY"
     assert "frame-ancestors 'none'" in respuesta.headers["Content-Security-Policy"]
+
+
+def test_csp_de_swagger_no_debilita_la_api(client):
+    documentacion = client.get("/api/v1/docs")
+    assert documentacion.status_code == 200
+    csp_docs = documentacion.headers["Content-Security-Policy"]
+    assert "https://unpkg.com" in csp_docs
+    assert "/static/swagger-init.js" in documentacion.get_data(as_text=True)
+
+    csp_api = client.get("/api/v1/health").headers["Content-Security-Policy"]
+    assert "https://unpkg.com" not in csp_api
+    assert client.get("/static/swagger-init.js").status_code == 200

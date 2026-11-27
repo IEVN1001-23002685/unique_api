@@ -115,9 +115,9 @@ def autenticar(correo: str, password: str, ip=None):
     return usuario, access, refresh
 
 
-def refrescar(token: str, ip=None):
+def refrescar(token: str, ip=None, csrf_value=None):
     try:
-        datos = decode_token(token)
+        datos = decode_token(token, csrf_value=csrf_value)
     except Exception:
         raise ApiError("SESION_INVALIDA", "Token de refresco inválido", 401)
     if datos.get("type") != "refresh":

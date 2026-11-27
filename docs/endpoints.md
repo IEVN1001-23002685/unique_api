@@ -53,8 +53,8 @@ Ejecuta `SELECT 1`. No expone SQL, host, credenciales ni trazas.
 |---|---|---|---|---|
 | `POST` | `/auth/registro` | P | `nombre`, `apellidos`, `correo`, `telefono`, `password`, `acepta_privacidad` (**obligatorio, `true`**), opcional `acepta_promociones` | `201`, `{ access_token, usuario }` + cookie de refresco; crea `CLIENTE` |
 | `POST` | `/auth/login` | P | `correo`, `password` | `200`, `{ access_token, usuario }` + cookie de refresco |
-| `POST` | `/auth/refrescar` | P | Cookie `refresh_token_cookie` | `200`, nuevo `access_token` y rotación de cookie |
-| `POST` | `/auth/logout` | autenticado | Cookie de refresco; cabecera Bearer | `200`, revoca el refresco |
+| `POST` | `/auth/refrescar` | P | Cookie `refresh_token` y cabecera `X-CSRF-TOKEN` | `200`, nuevo `access_token` y rotación de cookie |
+| `POST` | `/auth/logout` | autenticado | Cookie `refresh_token`, cabecera `X-CSRF-TOKEN` y Bearer | `200`, revoca el refresco |
 | `POST` | `/auth/recuperar` | P | `correo` | `200`, mensaje genérico |
 | `POST` | `/auth/restablecer` | P | `token`, `password` | `200` |
 
@@ -64,9 +64,10 @@ Errores habituales: `400 VALIDACION`, `401 CREDENCIALES_INVALIDAS`/`SESION_INVAL
 - Rate limit de login: 5 intentos por minuto por IP y por correo.
 - Access token: 15 minutos en `Authorization: Bearer`.
 - Refresh token: 7 días en cookie `httpOnly`; `JWT_COOKIE_SAMESITE` es configurable (`Strict`
-  por defecto) y `Secure` en producción. Si se usa `SameSite=None`, la configuración exige
-  `JWT_COOKIE_SECURE=true` y `JWT_COOKIE_CSRF_PROTECT=true`; el frontend envía entonces
-  `X-CSRF-TOKEN` desde la cookie `csrf_refresh_token` al refrescar; las rutas protegidas usan el access token en `Authorization`.
+  por defecto) y `Secure` en producción. `JWT_COOKIE_CSRF_PROTECT` está activo por defecto: el
+  backend valida el doble envío en `/auth/refrescar` y `/auth/logout` cuando la cookie de refresco
+  se lee manualmente. El frontend envía `X-CSRF-TOKEN` desde la cookie legible
+  `csrf_refresh_token`; las rutas protegidas usan el access token en `Authorization`.
 - La misma clave de refresco solo sirve una vez; al usarla se emite una nueva y la anterior queda revocada.
 - El frontend serializa los refrescos (`single-flight`): una sola petición `/auth/refrescar`
   por lote de 401 y cabecera `X-Auth-Refresco-Intentado` para no repetir indefinidamente. Si el

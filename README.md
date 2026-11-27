@@ -139,31 +139,31 @@ Los datos de MySQL y los archivos subidos viven en volúmenes nombrados y sobrev
 
 Railway no ejecuta `compose.yaml`; despliega servicios separados desde el `Dockerfile`.
 
-1. Crea un servicio **MySQL** en Railway y un servicio **API** desde este repo.
+1. Crea un servicio **MySQL** en Railway y un servicio **API** desde este repo. La API debe usar la URL privada de MySQL dentro del mismo proyecto.
 2. En el servicio API configura variables de entorno:
    - `APP_ENV=production`
    - `APP_DEBUG=false`
-   - `SECRET_KEY` y `JWT_SECRET_KEY` con valores aleatorios largos y diferentes (por ejemplo, generados con `python -c "import secrets; print(secrets.token_urlsafe(48))"`). No reutilices estos secretos entre entornos.
+   - `SECRET_KEY` y `JWT_SECRET_KEY` con valores aleatorios largos y diferentes (por ejemplo, generados con `python -c "import secrets; print(secrets.token_urlsafe(48))"`). No reutilices estos secretos entre entornos. La app falla en el arranque si faltan o valen `change_me`.
    - `DATABASE_URL=${{MySQL.MYSQL_URL}}`, sustituyendo `MySQL` por el nombre exacto del servicio de base de datos. Railway entrega `mysql://...`; la app y el script de espera lo normalizan a `mysql+pymysql://...`. Si la referencia no aplica, construye la URL como `mysql+pymysql://<usuario>:<contraseña-url-encoded>@<host-privado>:<puerto>/<base>?charset=utf8mb4`.
-   - `CORS_ORIGINS=https://<dominio-frontend>` con el origen real, sin ruta final; para varios orígenes, sepáralos por comas.
+   - `CORS_ORIGINS=https://<dominio-frontend>` con el origen real, sin ruta final; para varios orígenes, sepáralos por comas. No uses `*`.
    - `JWT_COOKIE_SECURE=true`
-   - `JWT_COOKIE_SAMESITE=Strict` (use `None` solo si Angular y la API están en sitios distintos; entonces añada `JWT_COOKIE_CSRF_PROTECT=true`)
-   - `JWT_COOKIE_CSRF_PROTECT=false` (o `true` con `SameSite=None`)
+   - `JWT_COOKIE_SAMESITE=None` (el frontend y la API están en sitios distintos)
+   - `JWT_COOKIE_CSRF_PROTECT=true` (obligatorio con `SameSite=None`; el frontend envía `X-CSRF-TOKEN` al refrescar y al cerrar sesión)
    - `TZ=America/Mexico_City`
    - `WEB_CONCURRENCY=1`
-3. Railway asigna `PORT`; el contenedor ya lo usa automáticamente. No fijes `APP_PORT` salvo pruebas locales.
-4. Monta un **Volume** en `/var/lib/unique/uploads` para conservar imágenes. Añade `RAILWAY_RUN_UID=0` al servicio API: Railway monta los volúmenes como `root` y la imagen ejecuta con el usuario no-root `app`.
-5. Ejecuta una vez en el shell del servicio API:
+3. Configura el comando **Pre-Deploy** de Railway como `sh scripts/pre_deploy.sh`. Ejecuta `wait_for_db.py` y `flask db upgrade`; no siembra datos automáticamente.
+4. Railway asigna `PORT`; el contenedor escucha en `0.0.0.0:$PORT`. No fijes `APP_PORT` salvo pruebas locales.
+5. Monta un **Volume** en `/var/lib/unique/uploads` para conservar imágenes. El entrypoint ajusta la propiedad y los procesos de Gunicorn/scheduler bajan a `app` (uid 10001) con `gosu`; **no** configures `RAILWAY_RUN_UID=0`.
+6. Después del primer deploy, siembra catálogos y crea cuentas de forma explícita y controlada:
 
 ```bash
-flask db upgrade
 python -m scripts.seed
 python -m scripts.create_admin admin
 ```
 
-6. Después del deploy, verifica `GET /api/v1/health`, `GET /api/v1/health/db` y un inicio de sesión en `POST /api/v1/auth/login`.
+7. Verifica `GET /api/v1/health`, `GET /api/v1/health/db` (exige esquema migrado) y un inicio de sesión en `POST /api/v1/auth/login`.
 
-Notas: no instales phpMyAdmin dentro de la API. Si escalas a más de una réplica, configura `RATELIMIT_STORAGE_URI` con un almacén compartido; el límite en memoria no se comparte entre instancias. Si escribes `DATABASE_URL` manualmente, URL-encodea los caracteres reservados de usuario/contraseña; Railway recomienda usar la referencia privada `MYSQL_URL` dentro del mismo proyecto en vez del endpoint público.
+Notas: no instales phpMyAdmin dentro de la API. Si escalas a más de una réplica, configura `RATELIMIT_STORAGE_URI` con `redis://...` y un servicio Redis; `memory://` no se comparte entre instancias. El scheduler renueva la verificación de su bloqueo MySQL antes de cada tarea. Si escribes `DATABASE_URL` manualmente, URL-encodea los caracteres reservados de usuario/contraseña; Railway recomienda usar la referencia privada `MYSQL_URL` dentro del mismo proyecto en vez del endpoint público.
 
 ## Solución de problemas
 

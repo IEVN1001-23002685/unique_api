@@ -4,7 +4,7 @@ import os
 import re
 import sys
 import time
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
@@ -14,6 +14,10 @@ def ocultar_secretos(mensaje: str) -> str:
     secreto = os.getenv("MYSQL_PASSWORD", "")
     if secreto:
         mensaje = mensaje.replace(secreto, "***")
+    destino = urlparse(normalizar_database_url(os.getenv("DATABASE_URL", "").strip()))
+    if destino.password:
+        mensaje = mensaje.replace(unquote(destino.password), "***")
+    mensaje = re.sub(r"(?i)(://[^:/\s]+:)[^@/\s]+@", r"\1***@", mensaje)
     return re.sub(r"(?i)password=[^&\s]+", "password=***", mensaje)
 
 
@@ -29,9 +33,17 @@ def esperar_base_de_datos() -> int:
         print("DATABASE_URL no está definida", file=sys.stderr)
         return 1
 
+    try:
+        timeout = int(os.getenv("DB_WAIT_TIMEOUT", "60"))
+        if timeout <= 0:
+            raise ValueError
+    except ValueError:
+        print("DB_WAIT_TIMEOUT debe ser un entero positivo", file=sys.stderr)
+        return 1
+
     destino = urlparse(url)
     ubicacion = f"{destino.hostname or '?'}:{destino.port or 3306}/{destino.path.lstrip('/') or '?'}"
-    limite = time.monotonic() + int(os.getenv("DB_WAIT_TIMEOUT", "60"))
+    limite = time.monotonic() + timeout
     motor = create_engine(url, poolclass=NullPool, connect_args={"connect_timeout": 5})
 
     intento = 0

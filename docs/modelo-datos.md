@@ -137,6 +137,8 @@ Revisiones aplicadas:
 3. `b2c3d4e5f6a7` — `Reversos de merma y vista neta` (columna `reversa_de_id` y ajuste de
    `v_merma_resumen`).
 4. `c4d5e6f7a8b9` — `Endurecer inmutabilidad de movimientos` (triggers `BEFORE UPDATE/DELETE`).
+5. `d5e6f7a8b9c0` — `Aceptación de privacidad en registro` (columna `acepta_privacidad`).
 
 Elaboración: `docker compose exec api flask db migrate -m "descripcion"`;
-aplicación: `docker compose exec api flask db upgrade`.
+aplicación local: `docker compose exec api flask db upgrade`; en Railway, Pre-Deploy:
+`sh scripts/pre_deploy.sh`. Nunca se usa `db.create_all()` ni `downgrade()` en producción.

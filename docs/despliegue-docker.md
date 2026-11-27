@@ -115,26 +115,28 @@ APP_DEBUG=false
 SECRET_KEY=<valor-largo-unico>
 JWT_SECRET_KEY=<valor-largo-unico>
 JWT_COOKIE_SECURE=true
+JWT_COOKIE_SAMESITE=None
+JWT_COOKIE_CSRF_PROTECT=true
 DATABASE_URL=${{MySQL.MYSQL_URL}}
 CORS_ORIGINS=https://tu-frontend.example
 TZ=America/Mexico_City
 WEB_CONCURRENCY=1
-RAILWAY_RUN_UID=0
 ```
 
 Notas:
 
-- Railway inyecta `PORT`; el contenedor escucha en `${PORT:-${APP_PORT:-8000}}`.
+- Railway inyecta `PORT`; el contenedor escucha en `0.0.0.0:$PORT`.
 - Sustituye `MySQL` en `${{MySQL.MYSQL_URL}}` por el nombre exacto del servicio de base de datos en Railway. `MYSQL_URL` usa `mysql://...`; `app/config.py` y `scripts/wait_for_db.py` lo normalizan a `mysql+pymysql://...`. Como alternativa manual: `mysql+pymysql://<usuario>:<contraseña-url-encoded>@<host-privado>:<puerto>/<base>?charset=utf8mb4`.
 - Genera valores aleatorios largos y diferentes para `SECRET_KEY` y `JWT_SECRET_KEY` (por ejemplo, `python -c "import secrets; print(secrets.token_urlsafe(48))"`). La aplicación rechaza los valores vacíos o `change_me` en producción.
-- Monta un Volume en `/var/lib/unique/uploads`; el filesystem del contenedor es efímero. Railway monta volúmenes como `root`; `RAILWAY_RUN_UID=0` permite al proceso guardar archivos en el volumen.
-- Tras el primer deploy, ejecuta `flask db upgrade`, `python -m scripts.seed` y crea cuentas con
+- Configura como Pre-Deploy: `sh scripts/pre_deploy.sh`. Ejecuta la espera a MySQL y `flask db upgrade`, sin semillas automáticas.
+- Monta un Volume en `/var/lib/unique/uploads`; el filesystem del contenedor es efímero. El entrypoint hace `chown`; Supervisor abre los logs como root y baja a `app` (uid 10001) para Gunicorn y el scheduler. No configures `RAILWAY_RUN_UID=0`.
+- Tras el primer deploy, ejecuta de forma explícita `python -m scripts.seed` y crea cuentas con
   `python -m scripts.create_admin admin` (usa prompt seguro; no pongas la contraseña en el comando).
-- Verifica `GET /api/v1/health`, `GET /api/v1/health/db` y el inicio de sesión mediante
+- Verifica `GET /api/v1/health`, `GET /api/v1/health/db` (requiere esquema migrado) y el inicio de sesión mediante
   `POST /api/v1/auth/login`.
 - phpMyAdmin, si se necesita, debe desplegarse como servicio separado.
 - El rate limit en memoria solo es seguro con una réplica; para escalar, configura
-  `RATELIMIT_STORAGE_URI`.
+  `RATELIMIT_STORAGE_URI=redis://...` y añade Redis como servicio.
 
 ## Seguridad
 

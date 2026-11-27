@@ -1,6 +1,6 @@
 """Fabrica de la aplicacion Flask de UNIQUE."""
 
-from flask import Flask
+from flask import Flask, request
 
 from app.blueprints.admin import admin_bp
 from app.blueprints.alertas import alertas_bp
@@ -86,6 +86,17 @@ def _registrar_errores_jwt(manager) -> None:
         return ApiError("SESION_EXPIRADA", "La sesión ha expirado", 401).respuesta()
 
 
+CSP_API = (
+    "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+)
+# CSP exclusiva de Swagger UI: no se relaja la del resto de la API.
+CSP_DOCS = (
+    "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; "
+    "script-src 'self' https://unpkg.com; style-src https://unpkg.com 'unsafe-inline'; "
+    "font-src https://unpkg.com data:; img-src 'self' data:; connect-src 'self'"
+)
+
+
 def _registrar_cabeceras_de_seguridad(app: Flask) -> None:
     @app.after_request
     def aplicar(respuesta):
@@ -93,6 +104,6 @@ def _registrar_cabeceras_de_seguridad(app: Flask) -> None:
         respuesta.headers["X-Frame-Options"] = "DENY"
         respuesta.headers["Referrer-Policy"] = "no-referrer"
         respuesta.headers["Content-Security-Policy"] = (
-            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+            CSP_DOCS if request.path == "/api/v1/docs" else CSP_API
         )
         return respuesta

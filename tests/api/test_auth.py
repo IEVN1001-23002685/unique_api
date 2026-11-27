@@ -13,6 +13,12 @@ def iniciar_sesion(client, correo, password):
     return {"Authorization": f"Bearer {respuesta.get_json()['access_token']}"}
 
 
+def cabecera_csrf(client):
+    cookie = client.get_cookie("csrf_refresh_token")
+    assert cookie is not None, "El login debe emitir la cookie de doble envío CSRF"
+    return {"X-CSRF-TOKEN": cookie.value}
+
+
 def test_registro_publico_crea_cliente(client, app):
     respuesta = client.post(
         "/api/v1/auth/registro",
@@ -148,23 +154,33 @@ def test_refresh_tokens_se_rotan_y_se_revoca_el_anterior(client, crear_usuario, 
         if valor.startswith("refresh_token")
     )
     nombre, valor_original = cookie_original.split("=", 1)
+    csrf = cabecera_csrf(client)
 
-    primera = client.post("/api/v1/auth/refrescar")
+    primera = client.post("/api/v1/auth/refrescar", headers=csrf)
     assert primera.status_code == 200
     assert "access_token" in primera.get_json()
 
     cliente_sin_cookies = app.test_client()
     reintento = cliente_sin_cookies.post(
         "/api/v1/auth/refrescar",
-        headers={"Cookie": f"{nombre}={valor_original}"},
+        headers={**csrf, "Cookie": f"{nombre}={valor_original}"},
     )
     assert reintento.status_code == 401
     assert reintento.get_json()["codigo"] == "SESION_INVALIDA"
 
 
+def test_refrescar_requiere_cabecera_csrf(client, crear_usuario):
+    usuario = crear_usuario()
+    iniciar_sesion(client, usuario["correo"], usuario["password"])
+
+    respuesta = client.post("/api/v1/auth/refrescar")
+    assert respuesta.status_code == 401
+    assert respuesta.get_json()["codigo"] == "CSRF_INVALIDO"
+
+
 def test_logout_revoca_refresh(client, crear_usuario):
     usuario = crear_usuario()
-    headers = iniciar_sesion(client, usuario["correo"], usuario["password"])
+    headers = {**iniciar_sesion(client, usuario["correo"], usuario["password"]), **cabecera_csrf(client)}
     respuesta = client.post("/api/v1/auth/logout", headers=headers)
     assert respuesta.status_code == 200
     posterior = client.post("/api/v1/auth/refrescar")

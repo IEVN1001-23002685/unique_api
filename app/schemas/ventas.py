@@ -1,6 +1,6 @@
 """Esquemas de ventas, pagos, reembolsos y descuentos (M08)."""
 
-from marshmallow import Schema, fields, validate
+from marshmallow import EXCLUDE, Schema, fields, validate
 
 from app.schemas.cuenta import DireccionCrearSchema
 
@@ -18,6 +18,9 @@ class VentaFiltrosSchema(Schema):
     estado = fields.Str(validate=validate.OneOf(["ACTIVA", "CANCELADA"]))
     estado_pago = fields.Str(validate=validate.OneOf(ESTADO_PAGO))
     q = fields.Str(validate=validate.Length(max=120))
+
+    class Meta:
+        unknown = EXCLUDE
 
 
 class VentaLineaSchema(Schema):
@@ -167,6 +170,9 @@ class DescuentoFiltrosSchema(Schema):
     activo = fields.Bool(allow_none=True)
     aplicacion = fields.Str(validate=validate.OneOf(APLICACIONES_DESCUENTO))
     q = fields.Str(validate=validate.Length(max=100))
+
+    class Meta:
+        unknown = EXCLUDE
 
 
 class DescuentoSchema(Schema):
