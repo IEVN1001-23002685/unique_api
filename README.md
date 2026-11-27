@@ -67,8 +67,9 @@ docker compose exec api python -m pytest -q
 Si la API no conecta con MySQL: `docker compose exec api python scripts/diagnose_db.py`.
 Cualquier cambio en código requiere `docker compose build` antes de `up -d`.
 
-`flask db upgrade` aplica tres revisiones: Fase 1 (modelo completo, vistas e índices), vistas de
-lectura y `b2c3d4e5f6a7` (reversos de merma y neteo de `v_merma_resumen`). Las Fases 2 a 6 no
+`flask db upgrade` aplica cuatro revisiones: Fase 1 (modelo completo, vistas e índices), vistas de
+lectura, `b2c3d4e5f6a7` (reversos de merma y neteo de `v_merma_resumen`) y `d5e6f7a8b9c0`
+(columna `acepta_privacidad`). Las Fases 2 a 6 no
 añadieron tablas funcionales: reutilizan el modelo y la tabla de infraestructura
 `idempotencia_operacion` (alcances `checkout:pagar`, `recepciones:registrar` y
 `produccion:iniciar`). Después ejecute las semillas, que son idempotentes:
@@ -88,6 +89,24 @@ docker compose exec api python -m scripts.create_admin operativo
 
 No hay contraseñas fijas en el código ni en las semillas.
 
+### Alta de cuentas por rol e inicio de sesión real
+
+No hay perfil de demostración ni atajo de sesión: cada rol entra con su propia cuenta.
+
+1. Ingrese como `ADMIN` con las credenciales configuradas en `.env` (o creadas con
+   `python -m scripts.create_admin admin`). No hay contraseñas quemadas en el código.
+2. En el panel M22, o con `POST /api/v1/usuarios`, dé de alta la cuenta indicando
+   `nombre`, `apellidos`, `correo`, `telefono`, `password` (mínimo 8 caracteres) y `rol`
+   (`CLIENTE`, `OPERATIVO` o `ADMIN`). La contraseña la elige el administrador y se
+   almacena solo como hash; la respuesta nunca la devuelve.
+3. La cuenta queda `ACTIVA`. Con esas credenciales, `POST /api/v1/auth/login` devuelve
+   `{ access_token, usuario }` con `usuario.rol` real. Angular deriva de ahí menús y guards;
+   `ADMIN` también satisface los permisos de `OPERATIVO`.
+4. `/auth/registro` sigue siendo público y crea solo `CLIENTE`, exigiendo
+   `acepta_privacidad=true`. El alta administrativa no es un registro del titular: deja
+   `acepta_privacidad=false` por defecto; si la persona acepta el aviso, debe registrarse
+   por ese medio.
+
 La Fase 3 está cubierta por `tests/integration/test_fase3_productos.py`,
 `test_fase3_materiales.py` y `test_fase3_compras.py`: SKU y folios, activación de productos y
 recetas, receta `VIGENTE` no editable, ajustes con movimientos inmutables, PEPS, recepciones
@@ -101,8 +120,10 @@ de reemplazo y transiciones de pedidos. La Fase 6 añade `tests/integration/test
 cola de preparación con verificación y empaque PEPS, etiqueta y hoja de reparto en PDF, ciclo de
 entrega con reingreso, dos fallos con alerta crítica, KPIs y permisos de dashboard, alertas y sus
 reglas, catálogos con códigos inmutables, bitácora y las seis tareas programadas. La suite
-completa verificada es `75 passed`. Las imágenes se guardan en el volumen de uploads, se validan
-con Pillow y se rechazan si superan 2 MB.
+completa verificada al cierre es `86 passed` (16 advertencias de `datetime.utcnow` deprecado).
+Las imágenes se guardan en el volumen de uploads, se validan
+con Pillow y se rechazan si superan 2 MB; se consultan públicamente en
+`GET /uploads/{nombre}`.
 
 ## Detener y reiniciar
 

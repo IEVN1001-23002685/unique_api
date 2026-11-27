@@ -126,6 +126,9 @@ confirmación del equipo.
 | M06 · tarjetas de pedido | El listado y el detalle serializan `imagen`, `fecha_estimada` y `fecha_entrega`; el detalle añade `total_articulos` y `imagen` por línea. `fecha_promesa` se conserva por compatibilidad. | Implementado |
 | M03 · filtro «Solo disponibles» | El modo local del frontend usa el mismo criterio que `disponibles=true` en Flask: existencia libre real, sin incluir «Bajo pedido». | Implementado |
 | M01 · enlace de demostración | El token `'demo'` no se envía a Flask (el esquema exige ≥20 caracteres): la pantalla solo informa que es una demostración y no simula un cambio de contraseña. | Implementado |
+| M01/M22 · fin del perfil de demostración | Se eliminaron `PerfilDemoServicio`, `selector-perfil-demo` y `rol-demo.guard`. El rol visible y los permisos salen de `AuthStateService`, alimentado por `/auth/login`; no hay rol `ADMIN` por defecto sin sesión. Las cuentas de `CLIENTE`, `OPERATIVO` y `ADMIN` se crean desde M22 (`POST /usuarios`) con contraseña elegida por el administrador. | Implementado |
+| M22 · privacidad en alta administrativa | `UsuarioCrearSchema` no exige `acepta_privacidad`: el alta la hace un administrador, no el titular, y la columna queda en `false` por defecto. La aceptación directa sigue en `/auth/registro`, donde el campo es obligatorio y `true`. | Decidido |
+| M03/M10 · entrega de imágenes | Flask guarda los archivos validados y los sirve con `GET /uploads/{nombre}`, fuera de `/api/v1`. Como el contrato devuelve rutas relativas, el frontend resuelve `/uploads/...` contra el origen de `environment.apiBaseUrl` mediante `UrlImagenPipe`; los recursos locales `/prendas/...` y las vistas previas `blob:`/`data:` no se modifican. | Implementado |
 
 ## Convención de nombres
 

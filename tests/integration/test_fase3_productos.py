@@ -340,6 +340,33 @@ def test_imagenes_rechazan_contenido_falso_mime_y_tamano(
             os.remove(ruta)
 
 
+def test_imagen_subida_esta_disponible_publicamente(client, headers_admin, producto_base):
+    url = f"/api/v1/productos/{producto_base['id']}/imagenes"
+    subida = client.post(
+        url,
+        data={"color": "GR", "archivo": (io.BytesIO(_png()), "visible.png", "image/png")},
+        headers=headers_admin,
+    )
+    assert subida.status_code == 201, subida.get_json()
+    ruta_publica = subida.get_json()["url"]
+    respuesta = client.get(ruta_publica)
+    assert respuesta.status_code == 200
+    assert respuesta.mimetype == "image/png"
+    assert respuesta.data == _png()
+    assert client.get("/uploads/no-existe.png").status_code == 404
+    assert client.get("/uploads/%2E%2E%2Fapp.py").status_code == 404
+
+    import os
+
+    with client.application.app_context():
+        os.remove(
+            os.path.join(
+                client.application.config["UPLOAD_FOLDER"],
+                ruta_publica.rsplit("/", 1)[-1],
+            )
+        )
+
+
 def test_roles_de_productos_y_recetas(client, headers_admin, headers_operativo, headers_cliente):
     for ruta in ("/api/v1/productos", "/api/v1/recetas"):
         assert client.get(ruta).status_code == 401

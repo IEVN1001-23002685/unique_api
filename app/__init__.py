@@ -14,6 +14,7 @@ from app.blueprints.dashboard import dashboard_bp
 from app.blueprints.devoluciones import devoluciones_bp
 from app.blueprints.entregas import entregas_bp
 from app.blueprints.health import health_bp
+from app.blueprints.imagenes import imagenes_bp
 from app.blueprints.inventario_mp import inventario_mp_bp
 from app.blueprints.inventario_pt import inventario_pt_bp
 from app.blueprints.mermas import mermas_bp
@@ -43,6 +44,7 @@ def create_app(configuracion=None) -> Flask:
     registrar_manejadores_de_error(app)
     _registrar_errores_jwt(jwt)
     app.register_blueprint(health_bp)
+    app.register_blueprint(imagenes_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(cuenta_bp)
     app.register_blueprint(catalogo_bp)

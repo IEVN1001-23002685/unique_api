@@ -1,7 +1,16 @@
 import secrets
 
+import pytest
+
 from app.extensions import db
-from app.models import Bitacora, Configuracion, Rol, Usuario
+from app.models import (
+    Bitacora,
+    Configuracion,
+    RecuperacionContrasena,
+    Rol,
+    TokenRefresco,
+    Usuario,
+)
 
 
 def test_admin_lista_usuarios_paginado(client, headers_admin):
@@ -25,33 +34,59 @@ def test_cliente_no_puede_administrar_usuarios(client, headers_cliente):
     assert respuesta.status_code == 403
 
 
-def test_admin_crea_operativo(client, headers_admin, app):
-    correo = f"operativo-{secrets.token_hex(5)}@example.com"
+@pytest.mark.parametrize("rol", ["CLIENTE", "OPERATIVO", "ADMIN"])
+def test_admin_crea_cuenta_real_por_rol_y_login_devuelve_ese_rol(
+    client, headers_admin, app, rol
+):
+    correo = f"alta-{rol.lower()}-{secrets.token_hex(5)}@example.com"
+    password = "ClaveSegura123!"
     respuesta = client.post(
         "/api/v1/usuarios",
         headers=headers_admin,
         json={
             "nombre": "Nuevo",
-            "apellidos": "Operativo",
+            "apellidos": rol.title(),
             "correo": correo,
             "telefono": "1234567890",
-            "password": "ClaveSegura123!",
-            "rol": "OPERATIVO",
+            "password": password,
+            "rol": rol,
         },
     )
-    assert respuesta.status_code == 201
-    assert respuesta.get_json()["rol"] == "OPERATIVO"
+    assert respuesta.status_code == 201, respuesta.get_json()
+    creado = respuesta.get_json()
+    assert creado["rol"] == rol
+    assert creado["estado_cuenta"] == "ACTIVA"
+    assert "password_hash" not in creado
+
+    acceso = client.post("/api/v1/auth/login", json={"correo": correo, "password": password})
+    assert acceso.status_code == 200, acceso.get_json()
+    datos = acceso.get_json()
+    assert datos["usuario"]["rol"] == rol
+    assert datos["usuario"]["correo"] == correo
+    assert "password_hash" not in datos["usuario"]
+    assert datos["access_token"]
+
     with app.app_context():
-        creado = db.session.query(Usuario).filter_by(correo=correo).one()
+        usuario = db.session.query(Usuario).filter_by(correo=correo).one()
+        assert usuario.rol.codigo == rol
+        assert usuario.password_hash != password
         registro = (
             db.session.query(Bitacora)
-            .filter_by(accion="USUARIO_CREADO", entidad="usuario", entidad_id=creado.id)
+            .filter_by(accion="USUARIO_CREADO", entidad="usuario", entidad_id=usuario.id)
             .order_by(Bitacora.id.desc())
             .first()
         )
         assert registro is not None
         assert registro.usuario_id is not None
-        db.session.delete(creado)
+
+        # La cuenta es real: deja rastros en bitácora y tokens, que se limpian al terminar.
+        db.session.query(TokenRefresco).filter_by(usuario_id=usuario.id).delete()
+        db.session.query(RecuperacionContrasena).filter_by(usuario_id=usuario.id).delete()
+        db.session.query(Bitacora).filter(
+            (Bitacora.usuario_id == usuario.id)
+            | ((Bitacora.entidad == "usuario") & (Bitacora.entidad_id == usuario.id))
+        ).delete(synchronize_session=False)
+        db.session.delete(usuario)
         db.session.commit()
 
 

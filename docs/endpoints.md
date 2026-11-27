@@ -39,6 +39,14 @@ No consulta MySQL. Se usa como liveness de Docker y de Gunicorn.
 
 Ejecuta `SELECT 1`. No expone SQL, host, credenciales ni trazas.
 
+### `GET /uploads/{nombre}`
+
+- Rol: público (fuera del prefijo `/api/v1`).
+- Sirve las imágenes validadas por `POST /api/v1/productos/{producto_id}/imagenes` desde
+  `UPLOAD_FOLDER`; la URL devuelta por ese alta es exactamente `/uploads/{nombre}`.
+- `{nombre}` es un solo segmento y `send_from_directory` impide salir del directorio.
+- Respuesta `200` con el MIME de la imagen; `404` si el archivo no existe.
+
 ## M01 — Autenticación
 
 | Método | Ruta | Rol | Cuerpo | Respuesta |
@@ -104,6 +112,17 @@ exactas ni reservas. El catálogo no incluye costos, precios de compra ni márge
 `disponibles=true` filtra variantes activas con existencia libre (`existencia > reservado`):
 incluye `Disponible` y `Pocas unidades`, excluye `Bajo pedido` y `Agotado`. El modo local
 del frontend aplica el mismo criterio.
+
+Para publicar una prenda: asignar `precio_venta` y al menos una imagen con
+`POST /api/v1/productos/{producto_id}/imagenes`, activar una receta por cada talla con
+`POST /api/v1/recetas/{receta_id}/activar` y llamar `POST /api/v1/productos/{producto_id}/activar`,
+que exige producto inactivo. Las semillas quedan en ese estado inactivo con variantes
+inactivas; si se encuentran activas sin variantes activas hay que corregir ese estado antes
+de publicar. `DELETE /api/v1/productos/{producto_id}` **no** debe usarse para volver a
+inactivo: borra el producto cuando no tiene historial. Con existencia 0 las variantes
+publicadas se muestran como `Bajo pedido` (`permite_bajo_pedido=true`) y quedan fuera del
+filtro `disponibles=true`; para que aparezcan como `Disponible` se requiere una entrada real
+de inventario (`POST /api/v1/inventario/producto/ajuste`).
 
 ## M04 — Carrito
 
@@ -565,6 +584,14 @@ Errores: `401`, `403`, `404 ALERTA_NO_ENCONTRADA`/`REGLA_NO_ENCONTRADA`,
 | `GET` | `/bitacora` | A | Lista paginada de acciones sensibles |
 | `GET` | `/configuracion` | A | Parámetros del sistema |
 | `PATCH` | `/configuracion` | A | Actualiza uno o varios parámetros |
+
+`POST /usuarios` acepta `rol` `CLIENTE`, `OPERATIVO` o `ADMIN` y la contraseña elegida por el
+administrador (mínimo 8 caracteres). La guarda solo como hash y nunca la devuelve. Es la vía de
+alta para los tres roles: no hay contraseñas fijas ni cuentas de demostración. Después del alta,
+`POST /auth/login` devuelve `usuario.rol`, del que dependen los menús y guards de Angular;
+`ADMIN` cumple los permisos de `OPERATIVO`. `/auth/registro` sigue siendo solo para `CLIENTE`
+y exige `acepta_privacidad=true`; las cuentas creadas por un administrador quedan con
+`acepta_privacidad=false` porque no representan la aceptación directa del titular.
 
 Los recursos de catálogo son exactamente seis: `color`, `talla`, `categoria-producto`,
 `categoria-material`, `causa-merma` y `tarifa-envio`. Los códigos usados en SKU
