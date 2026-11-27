@@ -34,8 +34,10 @@ Las rutas no contienen consultas complejas ni cálculos. El documento lo define 
 2. El contenedor `api` ejecuta `scripts/wait_for_db.py` con reintentos y backoff acotado.
 3. Se inicia Supervisor, que levanta Gunicorn enlazado a `APP_HOST:APP_PORT` con
    `WEB_CONCURRENCY` workers y el proceso `scheduler` (`python -m app.jobs`).
-4. El scheduler toma `GET_LOCK('unique_scheduler', 5)` en MySQL antes de iniciar APScheduler.
-5. `/api/v1/health` responde sin tocar MySQL; `/api/v1/health/db` usa `SELECT 1`.
+4. El scheduler toma `GET_LOCK('unique_scheduler', 5)` en MySQL antes de iniciar APScheduler,
+   mantiene la conexión con un latido de 60 s y ejecuta los jobs en un único hilo.
+5. `/api/v1/health` responde sin tocar MySQL; `/api/v1/health/db` comprueba MySQL y la
+   existencia de `alembic_version`.
 
 ## Configuración
 

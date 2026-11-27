@@ -87,8 +87,10 @@ Supervisor levanta:
 1. `scripts/wait_for_db.py` con espera acotada y secretos ofuscados en logs.
 2. Gunicorn en `0.0.0.0:${PORT:-8000}`, sin `--reload`.
 3. `python -m app.jobs`, con bloqueo MySQL `unique_scheduler`; antes de cada tarea se comprueba
-   que la conexión siga siendo la dueña del lock y, si se pierde, se reintenta sin entrar en bucle
-   de reinicios.
+   que la conexión siga siendo la dueña del lock con `ping(reconnect=False)`, se mantiene viva con
+   un latido de 60 s y los jobs corren en un único hilo. Si el lock se pierde, APScheduler se
+   detiene una sola vez, se libera la conexión y se reintenta en 30 s, sin tormenta de
+   `SchedulerNotRunningError`.
 
 ## 6. Primer deploy
 
@@ -166,6 +168,7 @@ flask db heads
 | `401 CSRF_INVALIDO` al refrescar | Falta `X-CSRF-TOKEN` o cambió la cookie | Confirmar que el frontend envía la cabecera y que no hay scripts de terceros leyendo cookies |
 | Error al subir imágenes | Volumen no montado o propiedad incorrecta | Revisar `/var/lib/unique/uploads` y que no se use `RAILWAY_RUN_UID=0` |
 | Scheduler duplicado | Múltiples réplicas tras pérdida de conexión | Verificar logs de `unique_scheduler`; mantener una réplica si no se ha probado el lock |
+| `SchedulerNotRunningError` o `Bloqueo perdido` repetido | Jobs concurrentes compartiendo la conexión del lock | Usar el scheduler actual (mutex, latido, un solo hilo y apagado protegido) y observar al menos un tick de 15 min |
 | Rate limit inconsistente | Múltiples workers/réplicas con `memory://` | Reducir a un worker o configurar Redis |
 | Swagger en blanco | CSP global aplicada a `/docs` | Verificar que se usa el código actual con CSP específica para `/docs` |
 

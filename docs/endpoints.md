@@ -607,7 +607,10 @@ ni cambiar el rol al último `ADMIN` activo (`422 ULTIMO_ADMIN`).
 
 El scheduler es un proceso único dentro del contenedor `api`, iniciado por Supervisor
 como `python -m app.jobs`. Usa `GET_LOCK('unique_scheduler', 5)` en MySQL para evitar
-duplicados si se escalan workers.
+duplicados si se escalan workers. La conexión que sostiene el lock se usa bajo un mutex,
+se mantiene viva con un latido de 60 s y se verifica con `ping(reconnect=False)` antes de
+cada tarea. Los jobs corren en un único hilo; si el lock se pierde, solo el primero que lo
+detecta detiene APScheduler y el proceso reintenta en 30 s.
 
 | Tarea | Frecuencia | Servicio invocado |
 |---|---|---|
