@@ -194,14 +194,21 @@ def importar(datos: dict, *, aplicar=False, verificar_archivos=True, usuario_id=
                 archivo = str(item.get("archivo") or "").strip()
                 if not url.startswith("/uploads/") or not archivo:
                     raise ImportacionError(f"URL de imagen no válida: {url!r}")
-                if verificar_archivos and not (carpeta_uploads / archivo).is_file():
+                imagen = db.session.scalar(
+                    select(ProductoImagen).where(ProductoImagen.url == url)
+                )
+                # Si la API ya subió la imagen, la fila en BD es la prueba de que el
+                # archivo existe en el volumen de Railway. Solo exigimos el archivo
+                # en disco cuando todavía tenemos que crear esa fila.
+                if (
+                    imagen is None
+                    and verificar_archivos
+                    and not (carpeta_uploads / archivo).is_file()
+                ):
                     raise ImportacionError(
                         f"Falta el archivo real de imagen en Railway: {archivo}. "
                         "Súbalo con scripts.subir_imagenes_reales antes de importar."
                     )
-                imagen = db.session.scalar(
-                    select(ProductoImagen).where(ProductoImagen.url == url)
-                )
                 if imagen is None:
                     color_id = None
                     if item.get("color"):
