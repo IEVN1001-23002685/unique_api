@@ -121,6 +121,56 @@ python -m scripts.create_admin admin
 `create_admin` pide la contraseña por prompt; no pasar contraseñas en la línea de comandos.
 Las semillas no se ejecutan automáticamente en arranques ni deploys posteriores.
 
+> `python -m scripts.seed` **no publica productos**. Es idempotente y solo inserta filas que
+> faltan: si ya existen, termina con `Registros insertados: {}`. Los productos y variantes se
+> crean deliberadamente con `activo = 0`, `precio_venta = 0` y `existencia = 0`; las recetas
+> quedan en `BORRADOR` y no se crean imágenes. Por eso `/api/v1/catalogo` sigue devolviendo `[]`
+> después de sembrar. Las variables `ADMIN_EMAIL`/`ADMIN_PASSWORD` y
+> `OPERATIVO_EMAIL`/`OPERATIVO_PASSWORD` deben existir en el **entorno del servicio en Railway**;
+> un `.env` local no se carga dentro del contenedor.
+
+Para diagnosticar por qué un producto no aparece:
+
+```sql
+SELECT p.id, p.nombre, p.activo, p.eliminado_en, p.precio_venta,
+       COUNT(v.id) AS variantes, SUM(v.activa = 1) AS variantes_activas
+FROM producto p
+LEFT JOIN variante_producto v ON v.producto_id = p.id
+GROUP BY p.id
+ORDER BY p.id;
+```
+
+`/api/v1/catalogo` exige `producto.activo = 1`, `eliminado_en IS NULL` y **al menos una**
+`variante_producto.activa = 1`. Si falta la segunda condición, el producto se omite aunque esté
+marcado como activo y tenga precio. `/api/v1/catalogo?disponibles=true` además exige
+`stock_variante.existencia > stock_variante.reservado`.
+
+Para publicar borradores que **ya existen en MySQL**, hacer backup y ejecutar desde el shell del
+servicio API de Railway:
+
+```bash
+# Informe: revisa precio, imágenes, variantes y recetas reales. No escribe nada.
+python -m scripts.publicar_semilla
+
+# Aplicar solo los candidatos que pasaron todas las validaciones.
+python -m scripts.publicar_semilla --aplicar
+```
+
+El script no crea productos, no inventa precios, no rellena URLs y no publica nada que tenga
+precio 0, imágenes ausentes o de prueba, sin variantes o sin receta `VIGENTE`. Cada producto
+publicado queda registrado en bitácora con la acción `PUBLICACION_SEMILLA`. Para limitar la revisión
+a un producto o activar una receta BORRADOR ya revisada:
+
+```bash
+python -m scripts.publicar_semilla --producto-id 818
+python -m scripts.publicar_semilla --producto-id 818 --activar-receta 12 --aplicar
+```
+
+Si un producto aparece en `omitidos`, corregir primero los datos reales en MySQL o subir la imagen
+con la API de administración; no relajar las validaciones del script. Para activar un producto
+nuevo desde cero, usar la API de administración: precio real, imagen real, recetas `VIGENTE` y
+`POST /api/v1/productos/<id>/activar`.
+
 7. Verificación mínima:
 
 ```bash
