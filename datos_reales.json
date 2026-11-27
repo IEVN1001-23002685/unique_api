@@ -1,0 +1,1384 @@
+{
+  "version": 1,
+  "productos": [
+    {
+      "codigo_sku": "BO",
+      "categoria_prefijo": "BO",
+      "nombre": "Bolsa de tela",
+      "descripcion": "Bolsa de manta cruda de 40 × 35 cm, talla única.",
+      "composicion_textil": "100% manta de algodón",
+      "guia_medidas": "Única, 40 × 35 cm",
+      "precio_venta": "215.87",
+      "permite_bajo_pedido": true,
+      "variantes": [
+        {
+          "sku": "BO-UN-BL",
+          "talla": "UN",
+          "color": "BL",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "BO-UN-NG",
+          "talla": "UN",
+          "color": "NG",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "BO-UN-GR",
+          "talla": "UN",
+          "color": "GR",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        }
+      ],
+      "imagenes": [
+        {
+          "url": "/uploads/132245d47e1a4ec0dbac31e377f2656f.png",
+          "archivo": "132245d47e1a4ec0dbac31e377f2656f.png",
+          "color": "NG",
+          "orden": 0
+        },
+        {
+          "url": "/uploads/3cadd2d783e143e52ada5b8941bb7d5b.png",
+          "archivo": "3cadd2d783e143e52ada5b8941bb7d5b.png",
+          "color": "GR",
+          "orden": 1
+        }
+      ],
+      "recetas": [
+        {
+          "talla": "UN",
+          "version": 1,
+          "mano_obra": "50.00",
+          "costo_bordado": "20.00",
+          "costos_indirectos": "9.67",
+          "nota": "",
+          "lineas": [
+            {
+              "material": "TEL-LON",
+              "cantidad_neta": "0.0200",
+              "factor_consumo": "1.000",
+              "merma_pct": "10.00",
+              "cantidad_bruta": "0.0222",
+              "nota": ""
+            },
+            {
+              "material": "HIL-COS",
+              "cantidad_neta": "4.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "10.00",
+              "cantidad_bruta": "4.4444",
+              "nota": ""
+            },
+            {
+              "material": "EST-HOJ",
+              "cantidad_neta": "0.4500",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "0.4500",
+              "nota": ""
+            },
+            {
+              "material": "ETQ-MAR",
+              "cantidad_neta": "0.0030",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "0.0030",
+              "nota": ""
+            },
+            {
+              "material": "ETQ-COM-BO",
+              "cantidad_neta": "0.1000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "0.1000",
+              "nota": ""
+            }
+          ],
+          "bordados": [
+            {
+              "diseno": "DIS-006",
+              "aplicaciones": 1,
+              "ubicacion": "León de los Aldama"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "codigo_sku": "SD",
+      "categoria_prefijo": "SD",
+      "nombre": "Sudadera",
+      "descripcion": "Sudadera con capucha, unisex, de felpa con acabado clásico universitario.",
+      "composicion_textil": "80% algodón, 20% poliéster",
+      "guia_medidas": "CH 48 × 66 cm · MD 51 × 69 cm · GD 54 × 72 cm",
+      "precio_venta": "336.75",
+      "permite_bajo_pedido": true,
+      "variantes": [
+        {
+          "sku": "SD-CH-BL",
+          "talla": "CH",
+          "color": "BL",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "SD-CH-NG",
+          "talla": "CH",
+          "color": "NG",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "SD-CH-GR",
+          "talla": "CH",
+          "color": "GR",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "SD-MD-BL",
+          "talla": "MD",
+          "color": "BL",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "SD-MD-NG",
+          "talla": "MD",
+          "color": "NG",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "SD-MD-GR",
+          "talla": "MD",
+          "color": "GR",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "SD-GD-BL",
+          "talla": "GD",
+          "color": "BL",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "SD-GD-NG",
+          "talla": "GD",
+          "color": "NG",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "SD-GD-GR",
+          "talla": "GD",
+          "color": "GR",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        }
+      ],
+      "imagenes": [
+        {
+          "url": "/uploads/3e2720b7cc80970462932b27e7bea3fc.png",
+          "archivo": "3e2720b7cc80970462932b27e7bea3fc.png",
+          "color": "BL",
+          "orden": 0
+        },
+        {
+          "url": "/uploads/ec6c812486fd56d26153f145b0d97b3b.png",
+          "archivo": "ec6c812486fd56d26153f145b0d97b3b.png",
+          "color": "NG",
+          "orden": 1
+        },
+        {
+          "url": "/uploads/e9351debcd8862fb858bf4157ec1f995.png",
+          "archivo": "e9351debcd8862fb858bf4157ec1f995.png",
+          "color": "GR",
+          "orden": 2
+        }
+      ],
+      "recetas": [
+        {
+          "talla": "CH",
+          "version": 1,
+          "mano_obra": "0.00",
+          "costo_bordado": "0.00",
+          "costos_indirectos": "0.00",
+          "nota": null,
+          "lineas": [
+            {
+              "material": "TEL-FEL",
+              "cantidad_neta": "0.9386",
+              "factor_consumo": "1.000",
+              "merma_pct": "15.00",
+              "cantidad_bruta": "1.1042",
+              "nota": null
+            },
+            {
+              "material": "TEL-RIB",
+              "cantidad_neta": "0.1048",
+              "factor_consumo": "1.000",
+              "merma_pct": "20.00",
+              "cantidad_bruta": "0.1310",
+              "nota": null
+            },
+            {
+              "material": "HIL-COS",
+              "cantidad_neta": "13.9500",
+              "factor_consumo": "1.000",
+              "merma_pct": "10.00",
+              "cantidad_bruta": "15.5000",
+              "nota": null
+            },
+            {
+              "material": "EST-HOJ",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-MAR",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-TAL-CH",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-COM-SD",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            }
+          ],
+          "bordados": [
+            {
+              "diseno": "DIS-001",
+              "aplicaciones": 1,
+              "ubicacion": null
+            }
+          ]
+        },
+        {
+          "talla": "MD",
+          "version": 1,
+          "mano_obra": "0.00",
+          "costo_bordado": "0.00",
+          "costos_indirectos": "0.00",
+          "nota": null,
+          "lineas": [
+            {
+              "material": "TEL-FEL",
+              "cantidad_neta": "1.0184",
+              "factor_consumo": "1.000",
+              "merma_pct": "15.00",
+              "cantidad_bruta": "1.1981",
+              "nota": null
+            },
+            {
+              "material": "TEL-RIB",
+              "cantidad_neta": "0.1137",
+              "factor_consumo": "1.000",
+              "merma_pct": "20.00",
+              "cantidad_bruta": "0.1421",
+              "nota": null
+            },
+            {
+              "material": "HIL-COS",
+              "cantidad_neta": "14.5400",
+              "factor_consumo": "1.000",
+              "merma_pct": "10.00",
+              "cantidad_bruta": "16.1556",
+              "nota": null
+            },
+            {
+              "material": "EST-HOJ",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-MAR",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-TAL-MD",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-COM-SD",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            }
+          ],
+          "bordados": [
+            {
+              "diseno": "DIS-001",
+              "aplicaciones": 1,
+              "ubicacion": null
+            }
+          ]
+        },
+        {
+          "talla": "GD",
+          "version": 1,
+          "mano_obra": "0.00",
+          "costo_bordado": "0.00",
+          "costos_indirectos": "0.00",
+          "nota": null,
+          "lineas": [
+            {
+              "material": "TEL-FEL",
+              "cantidad_neta": "1.1029",
+              "factor_consumo": "1.000",
+              "merma_pct": "15.00",
+              "cantidad_bruta": "1.2975",
+              "nota": null
+            },
+            {
+              "material": "TEL-RIB",
+              "cantidad_neta": "0.1231",
+              "factor_consumo": "1.000",
+              "merma_pct": "20.00",
+              "cantidad_bruta": "0.1539",
+              "nota": null
+            },
+            {
+              "material": "HIL-COS",
+              "cantidad_neta": "15.1400",
+              "factor_consumo": "1.000",
+              "merma_pct": "10.00",
+              "cantidad_bruta": "16.8222",
+              "nota": null
+            },
+            {
+              "material": "EST-HOJ",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-MAR",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-TAL-GD",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-COM-SD",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            }
+          ],
+          "bordados": [
+            {
+              "diseno": "DIS-001",
+              "aplicaciones": 1,
+              "ubicacion": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "codigo_sku": "PL",
+      "categoria_prefijo": "PL",
+      "nombre": "Playera",
+      "descripcion": "Camiseta unisex de manga tres cuartos, confeccionada en jersey peinado.",
+      "composicion_textil": "100% algodón",
+      "guia_medidas": "CH 46 × 64 cm · MD 49 × 67 cm · GD 52 × 70 cm",
+      "precio_venta": "116.10",
+      "permite_bajo_pedido": true,
+      "variantes": [
+        {
+          "sku": "PL-CH-BL",
+          "talla": "CH",
+          "color": "BL",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "PL-CH-NG",
+          "talla": "CH",
+          "color": "NG",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "PL-CH-GR",
+          "talla": "CH",
+          "color": "GR",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "PL-MD-BL",
+          "talla": "MD",
+          "color": "BL",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "PL-MD-NG",
+          "talla": "MD",
+          "color": "NG",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "PL-MD-GR",
+          "talla": "MD",
+          "color": "GR",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "PL-GD-BL",
+          "talla": "GD",
+          "color": "BL",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "PL-GD-NG",
+          "talla": "GD",
+          "color": "NG",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "PL-GD-GR",
+          "talla": "GD",
+          "color": "GR",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        }
+      ],
+      "imagenes": [
+        {
+          "url": "/uploads/7559ef64479b383084cd753e0c6c1f16.png",
+          "archivo": "7559ef64479b383084cd753e0c6c1f16.png",
+          "color": "BL",
+          "orden": 0
+        },
+        {
+          "url": "/uploads/68b53ae3b264bd33bda0328cfb29dcf4.png",
+          "archivo": "68b53ae3b264bd33bda0328cfb29dcf4.png",
+          "color": "NG",
+          "orden": 1
+        },
+        {
+          "url": "/uploads/7767f26662b9c17951aae4b40c602f5d.png",
+          "archivo": "7767f26662b9c17951aae4b40c602f5d.png",
+          "color": "GR",
+          "orden": 2
+        }
+      ],
+      "recetas": [
+        {
+          "talla": "CH",
+          "version": 1,
+          "mano_obra": "0.00",
+          "costo_bordado": "0.00",
+          "costos_indirectos": "0.00",
+          "nota": null,
+          "lineas": [
+            {
+              "material": "TEL-JER",
+              "cantidad_neta": "0.7778",
+              "factor_consumo": "1.000",
+              "merma_pct": "15.00",
+              "cantidad_bruta": "0.9151",
+              "nota": null
+            },
+            {
+              "material": "TEL-RIB",
+              "cantidad_neta": "0.0872",
+              "factor_consumo": "1.000",
+              "merma_pct": "20.00",
+              "cantidad_bruta": "0.1090",
+              "nota": null
+            },
+            {
+              "material": "HIL-COS",
+              "cantidad_neta": "11.4500",
+              "factor_consumo": "1.000",
+              "merma_pct": "10.00",
+              "cantidad_bruta": "12.7222",
+              "nota": null
+            },
+            {
+              "material": "EST-HOJ",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-MAR",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-TAL-CH",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-COM-PL",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            }
+          ],
+          "bordados": [
+            {
+              "diseno": "DIS-002",
+              "aplicaciones": 1,
+              "ubicacion": null
+            }
+          ]
+        },
+        {
+          "talla": "MD",
+          "version": 1,
+          "mano_obra": "0.00",
+          "costo_bordado": "0.00",
+          "costos_indirectos": "0.00",
+          "nota": null,
+          "lineas": [
+            {
+              "material": "TEL-JER",
+              "cantidad_neta": "0.9600",
+              "factor_consumo": "1.000",
+              "merma_pct": "15.00",
+              "cantidad_bruta": "1.1294",
+              "nota": null
+            },
+            {
+              "material": "TEL-RIB",
+              "cantidad_neta": "0.0946",
+              "factor_consumo": "1.000",
+              "merma_pct": "20.00",
+              "cantidad_bruta": "0.1183",
+              "nota": null
+            },
+            {
+              "material": "HIL-COS",
+              "cantidad_neta": "11.9300",
+              "factor_consumo": "1.000",
+              "merma_pct": "10.00",
+              "cantidad_bruta": "13.2556",
+              "nota": null
+            },
+            {
+              "material": "EST-HOJ",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-MAR",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-TAL-MD",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-COM-PL",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            }
+          ],
+          "bordados": [
+            {
+              "diseno": "DIS-002",
+              "aplicaciones": 1,
+              "ubicacion": null
+            }
+          ]
+        },
+        {
+          "talla": "GD",
+          "version": 1,
+          "mano_obra": "0.00",
+          "costo_bordado": "0.00",
+          "costos_indirectos": "0.00",
+          "nota": null,
+          "lineas": [
+            {
+              "material": "TEL-JER",
+              "cantidad_neta": "1.0396",
+              "factor_consumo": "1.000",
+              "merma_pct": "15.00",
+              "cantidad_bruta": "1.2231",
+              "nota": null
+            },
+            {
+              "material": "TEL-RIB",
+              "cantidad_neta": "0.1025",
+              "factor_consumo": "1.000",
+              "merma_pct": "20.00",
+              "cantidad_bruta": "0.1281",
+              "nota": null
+            },
+            {
+              "material": "HIL-COS",
+              "cantidad_neta": "12.4200",
+              "factor_consumo": "1.000",
+              "merma_pct": "10.00",
+              "cantidad_bruta": "13.8000",
+              "nota": null
+            },
+            {
+              "material": "EST-HOJ",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-MAR",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-TAL-GD",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-COM-PL",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            }
+          ],
+          "bordados": [
+            {
+              "diseno": "DIS-002",
+              "aplicaciones": 1,
+              "ubicacion": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "codigo_sku": "PN",
+      "categoria_prefijo": "PN",
+      "nombre": "Pantalón",
+      "descripcion": "Pantalón deportivo holgado unisex, de felpa con cintura ajustable de cordón.",
+      "composicion_textil": "80% algodón, 20% poliéster",
+      "guia_medidas": "CH 68 cm · MD 72 cm · GD 76 cm de cintura",
+      "precio_venta": "459.53",
+      "permite_bajo_pedido": true,
+      "variantes": [
+        {
+          "sku": "PN-CH-BL",
+          "talla": "CH",
+          "color": "BL",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "PN-CH-NG",
+          "talla": "CH",
+          "color": "NG",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "PN-CH-GR",
+          "talla": "CH",
+          "color": "GR",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "PN-MD-BL",
+          "talla": "MD",
+          "color": "BL",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "PN-MD-NG",
+          "talla": "MD",
+          "color": "NG",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "PN-MD-GR",
+          "talla": "MD",
+          "color": "GR",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "PN-GD-BL",
+          "talla": "GD",
+          "color": "BL",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "PN-GD-NG",
+          "talla": "GD",
+          "color": "NG",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "PN-GD-GR",
+          "talla": "GD",
+          "color": "GR",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        }
+      ],
+      "imagenes": [
+        {
+          "url": "/uploads/48a140754d976c620be2b2d250d22bb7.png",
+          "archivo": "48a140754d976c620be2b2d250d22bb7.png",
+          "color": "BL",
+          "orden": 0
+        },
+        {
+          "url": "/uploads/8019d262ca16993bbc6b976ca000f65d.png",
+          "archivo": "8019d262ca16993bbc6b976ca000f65d.png",
+          "color": "NG",
+          "orden": 1
+        },
+        {
+          "url": "/uploads/ad51d3efa567dbebd3760b050797f7aa.png",
+          "archivo": "ad51d3efa567dbebd3760b050797f7aa.png",
+          "color": "GR",
+          "orden": 2
+        }
+      ],
+      "recetas": [
+        {
+          "talla": "CH",
+          "version": 1,
+          "mano_obra": "0.00",
+          "costo_bordado": "0.00",
+          "costos_indirectos": "0.00",
+          "nota": null,
+          "lineas": [
+            {
+              "material": "TEL-FEL",
+              "cantidad_neta": "1.0364",
+              "factor_consumo": "1.000",
+              "merma_pct": "15.00",
+              "cantidad_bruta": "1.2193",
+              "nota": null
+            },
+            {
+              "material": "HIL-COS",
+              "cantidad_neta": "17.2000",
+              "factor_consumo": "1.000",
+              "merma_pct": "10.00",
+              "cantidad_bruta": "19.1111",
+              "nota": null
+            },
+            {
+              "material": "EST-ROL",
+              "cantidad_neta": "0.6100",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "0.6100",
+              "nota": null
+            },
+            {
+              "material": "EST-HOJ",
+              "cantidad_neta": "0.2500",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "0.2500",
+              "nota": null
+            },
+            {
+              "material": "AVI-COR",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "AVI-OJI",
+              "cantidad_neta": "2.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "2.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-MAR",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-TAL-CH",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-COM-PN",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            }
+          ],
+          "bordados": [
+            {
+              "diseno": "DIS-003",
+              "aplicaciones": 1,
+              "ubicacion": null
+            }
+          ]
+        },
+        {
+          "talla": "MD",
+          "version": 1,
+          "mano_obra": "0.00",
+          "costo_bordado": "0.00",
+          "costos_indirectos": "0.00",
+          "nota": null,
+          "lineas": [
+            {
+              "material": "TEL-FEL",
+              "cantidad_neta": "1.1245",
+              "factor_consumo": "1.000",
+              "merma_pct": "15.00",
+              "cantidad_bruta": "1.3229",
+              "nota": null
+            },
+            {
+              "material": "HIL-COS",
+              "cantidad_neta": "17.9200",
+              "factor_consumo": "1.000",
+              "merma_pct": "10.00",
+              "cantidad_bruta": "19.9111",
+              "nota": null
+            },
+            {
+              "material": "EST-ROL",
+              "cantidad_neta": "0.6100",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "0.6100",
+              "nota": null
+            },
+            {
+              "material": "EST-HOJ",
+              "cantidad_neta": "0.2500",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "0.2500",
+              "nota": null
+            },
+            {
+              "material": "AVI-COR",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "AVI-OJI",
+              "cantidad_neta": "2.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "2.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-MAR",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-TAL-MD",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-COM-PN",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            }
+          ],
+          "bordados": [
+            {
+              "diseno": "DIS-003",
+              "aplicaciones": 1,
+              "ubicacion": null
+            }
+          ]
+        },
+        {
+          "talla": "GD",
+          "version": 1,
+          "mano_obra": "0.00",
+          "costo_bordado": "0.00",
+          "costos_indirectos": "0.00",
+          "nota": null,
+          "lineas": [
+            {
+              "material": "TEL-FEL",
+              "cantidad_neta": "1.2178",
+              "factor_consumo": "1.000",
+              "merma_pct": "15.00",
+              "cantidad_bruta": "1.4327",
+              "nota": null
+            },
+            {
+              "material": "HIL-COS",
+              "cantidad_neta": "18.6600",
+              "factor_consumo": "1.000",
+              "merma_pct": "10.00",
+              "cantidad_bruta": "20.7333",
+              "nota": null
+            },
+            {
+              "material": "EST-ROL",
+              "cantidad_neta": "0.6100",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "0.6100",
+              "nota": null
+            },
+            {
+              "material": "EST-HOJ",
+              "cantidad_neta": "0.2500",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "0.2500",
+              "nota": null
+            },
+            {
+              "material": "AVI-COR",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "AVI-OJI",
+              "cantidad_neta": "2.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "2.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-MAR",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-TAL-GD",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-COM-PN",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            }
+          ],
+          "bordados": [
+            {
+              "diseno": "DIS-003",
+              "aplicaciones": 1,
+              "ubicacion": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "codigo_sku": "GO",
+      "categoria_prefijo": "GO",
+      "nombre": "Gorro",
+      "descripcion": "Gorro de invierno unisex en estambre acrílico, talla única.",
+      "composicion_textil": "100% acrílico",
+      "guia_medidas": "Única, 22 cm de circunferencia sin estirar",
+      "precio_venta": "94.07",
+      "permite_bajo_pedido": true,
+      "variantes": [
+        {
+          "sku": "GO-UN-BL",
+          "talla": "UN",
+          "color": "BL",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "GO-UN-NG",
+          "talla": "UN",
+          "color": "NG",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        },
+        {
+          "sku": "GO-UN-GR",
+          "talla": "UN",
+          "color": "GR",
+          "activa": true,
+          "stock": {
+            "existencia": 0,
+            "reservado": 0,
+            "stock_minimo": 5,
+            "cantidad_reposicion": 20
+          }
+        }
+      ],
+      "imagenes": [
+        {
+          "url": "/uploads/5d88cedc33d6ee9177f15e1791e87783.png",
+          "archivo": "5d88cedc33d6ee9177f15e1791e87783.png",
+          "color": "BL",
+          "orden": 0
+        },
+        {
+          "url": "/uploads/eb8ae86e9d8564da76b181a35af42163.png",
+          "archivo": "eb8ae86e9d8564da76b181a35af42163.png",
+          "color": "NG",
+          "orden": 1
+        },
+        {
+          "url": "/uploads/264e9a8394584131deff3d8c261f956c.png",
+          "archivo": "264e9a8394584131deff3d8c261f956c.png",
+          "color": "GR",
+          "orden": 2
+        }
+      ],
+      "recetas": [
+        {
+          "talla": "UN",
+          "version": 1,
+          "mano_obra": "0.00",
+          "costo_bordado": "0.00",
+          "costos_indirectos": "0.00",
+          "nota": null,
+          "lineas": [
+            {
+              "material": "HIL-EST",
+              "cantidad_neta": "130.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "5.00",
+              "cantidad_bruta": "136.8421",
+              "nota": null
+            },
+            {
+              "material": "HIL-COS",
+              "cantidad_neta": "4.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "10.00",
+              "cantidad_bruta": "4.4444",
+              "nota": null
+            },
+            {
+              "material": "EST-HOJ",
+              "cantidad_neta": "0.2500",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "0.2500",
+              "nota": null
+            },
+            {
+              "material": "ETQ-MAR",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            },
+            {
+              "material": "ETQ-COM-GO",
+              "cantidad_neta": "1.0000",
+              "factor_consumo": "1.000",
+              "merma_pct": "0.00",
+              "cantidad_bruta": "1.0000",
+              "nota": null
+            }
+          ],
+          "bordados": [
+            {
+              "diseno": "DIS-005",
+              "aplicaciones": 1,
+              "ubicacion": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

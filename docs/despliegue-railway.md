@@ -171,6 +171,65 @@ con la API de administración; no relajar las validaciones del script. Para acti
 nuevo desde cero, usar la API de administración: precio real, imagen real, recetas `VIGENTE` y
 `POST /api/v1/productos/<id>/activar`.
 
+### Migración de los productos reales desde la BD local
+
+Si el seed de Railway dejó los productos vacíos (`precio_venta = 0`, sin imágenes y con recetas en
+`BORRADOR`), pero la BD local sí contiene los productos reales, usar este flujo. No copia IDs:
+empareja por SKU (`SD`, `PL`, `PN`, `GO`, `BO`).
+
+1. En la máquina local, exportar los datos reales. El archivo generado es
+   `datos_reales.json` y no contiene secretos:
+
+   ```bash
+   python -m scripts.exportar_datos_reales datos_reales.json
+   ```
+
+   Debe ejecutarse donde esté disponible el volumen `unique_uploads_data` montado en
+   `/var/lib/unique/uploads`; el script verifica que cada imagen real exista.
+
+2. Crear en Railway la cuenta ADMIN si aún no existe:
+
+   ```bash
+   python -m scripts.create_admin admin
+   ```
+
+3. Subir las imágenes reales a Railway por la API de administración. Esto genera
+   `datos_reales_railway.json` con las URLs reales devueltas por Railway:
+
+   ```bash
+   export API_BASE_URL='https://<dominio-real-de-la-api>/api/v1'
+   export ADMIN_EMAIL='<correo-admin>'
+   read -rs ADMIN_PASSWORD; export ADMIN_PASSWORD
+
+   python -m scripts.subir_imagenes_reales \
+     datos_reales.json \
+     --uploads /var/lib/unique/uploads \
+     --salida datos_reales_railway.json
+   ```
+
+4. Copiar `datos_reales_railway.json` al contenedor de Railway y, desde el shell del servicio
+   API, revisar primero:
+
+   ```bash
+   python -m scripts.importar_datos_reales datos_reales_railway.json
+   ```
+
+   El informe muestra SKU, precio, número de variantes, imágenes y recetas. Solo después de
+   revisarlo:
+
+   ```bash
+   python -m scripts.importar_datos_reales datos_reales_railway.json --aplicar
+   ```
+
+El importador aplica todo en una sola transacción, activa las recetas validadas, publica los
+productos y deja constancia en bitácora con `IMPORTACION_DATOS_REALES`. Si falta algún archivo de
+imagen en el volumen de Railway, se detiene antes de escribir. Para generar solo un informe sin
+verificar archivos, usar `--no-verificar-archivos`.
+
+> Estos scripts deben existir en la imagen desplegada en Railway. Si el contenedor aún no los
+> incluye, hay que desplegar primero los cambios del repositorio backend; no basta con copiar el
+> JSON.
+
 7. Verificación mínima:
 
 ```bash
