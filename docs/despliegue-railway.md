@@ -248,6 +248,18 @@ catálogo y subir una imagen para confirmar que persiste tras reiniciar el servi
 - No ejecutar `flask db downgrade`, `db.drop_all()` ni seeds automáticos en producción.
 - Reiniciar la API no borra el volumen de imágenes. Si se recrea el volumen, copiar antes los
   archivos a un destino seguro.
+- Las 14 imágenes reales publicadas también viajan dentro de la imagen en `seed_uploads/`.
+  `docker-entrypoint.sh` las copia a `UPLOAD_FOLDER` **solo si faltan**, así que un redeploy
+  vuelve a servirlas aunque Railway no tenga un Volume configurado. No sobrescriben imágenes
+  subidas después desde el panel de administración.
+- Para validarlas después de cada deploy:
+
+```bash
+python -m scripts.verificar_imagenes \
+  --api-base-url https://<dominio-real-de-la-api>/api/v1
+```
+
+  El informe debe mostrar `correctas` igual a `total` y `http: 200` en cada imagen.
 - Si cambia el dominio del frontend, actualizar `CORS_ORIGINS` en la API y `API_BASE_URL` en el
   frontend; ambos deben apuntar al mismo entorno.
 - Para escalar a más de una réplica: añadir Redis, definir `RATELIMIT_STORAGE_URI=redis://...` y
@@ -276,6 +288,7 @@ flask db heads
 | Login desde el navegador sin sesión | `SameSite`/`Secure`/CORS incorrectos | `None` + `Secure` + `CSRF_PROTECT=true`, y origen exacto |
 | `401 CSRF_INVALIDO` al refrescar | Falta `X-CSRF-TOKEN` o cambió la cookie | Confirmar que el frontend envía la cabecera y que no hay scripts de terceros leyendo cookies |
 | Error al subir imágenes | Volumen no montado o propiedad incorrecta | Revisar `/var/lib/unique/uploads` y que no se use `RAILWAY_RUN_UID=0` |
+| Catálogo o carrito sin imagen | `/uploads/{nombre}` devuelve 404 | Ejecutar `scripts.verificar_imagenes`; confirmar que `seed_uploads/` esté en la imagen y que el entrypoint copie los archivos al arrancar |
 | Scheduler duplicado | Múltiples réplicas tras pérdida de conexión | Verificar logs de `unique_scheduler`; mantener una réplica si no se ha probado el lock |
 | `SchedulerNotRunningError` o `Bloqueo perdido` repetido | Jobs concurrentes compartiendo la conexión del lock | Usar el scheduler actual (mutex, latido, un solo hilo y apagado protegido) y observar al menos un tick de 15 min |
 | Rate limit inconsistente | Múltiples workers/réplicas con `memory://` | Reducir a un worker o configurar Redis |
