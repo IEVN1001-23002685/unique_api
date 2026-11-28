@@ -1,46 +1,57 @@
 """Esquemas de catálogos administrativos y filtros de bitácora (M22)."""
 
-from marshmallow import Schema, fields, validate
+from marshmallow import Schema, fields, pre_load, validate
 
 CP = validate.Regexp(r"^\d{5}$", error="El código postal debe tener 5 dígitos")
 CODIGO = validate.Regexp(r"^[A-Z]{2}$", error="El código debe tener 2 letras mayúsculas")
 HEX = validate.Regexp(r"^#[0-9A-Fa-f]{6}$", error="El color debe ser hexadecimal #RRGGBB")
 
 
-class ColorCrearSchema(Schema):
+class CodigoMayusculas:
+    @pre_load
+    def normalizar_codigo(self, datos, **kwargs):
+        normalizados = dict(datos)
+        for campo in ("codigo", "prefijo_sku"):
+            valor = normalizados.get(campo)
+            if isinstance(valor, str):
+                normalizados[campo] = valor.strip().upper()
+        return normalizados
+
+
+class ColorCrearSchema(CodigoMayusculas, Schema):
     codigo = fields.Str(required=True, validate=CODIGO)
     nombre = fields.Str(required=True, validate=validate.Length(min=1, max=40))
     hex = fields.Str(required=True, validate=HEX)
     es_comercial = fields.Bool(load_default=False)
 
 
-class ColorActualizarSchema(Schema):
+class ColorActualizarSchema(CodigoMayusculas, Schema):
     codigo = fields.Str(validate=CODIGO)
     nombre = fields.Str(validate=validate.Length(min=1, max=40))
     hex = fields.Str(validate=HEX)
     es_comercial = fields.Bool()
 
 
-class TallaCrearSchema(Schema):
+class TallaCrearSchema(CodigoMayusculas, Schema):
     codigo = fields.Str(required=True, validate=CODIGO)
     nombre = fields.Str(required=True, validate=validate.Length(min=1, max=40))
     orden = fields.Int(load_default=0, validate=validate.Range(min=0))
 
 
-class TallaActualizarSchema(Schema):
+class TallaActualizarSchema(CodigoMayusculas, Schema):
     codigo = fields.Str(validate=CODIGO)
     nombre = fields.Str(validate=validate.Length(min=1, max=40))
     orden = fields.Int(validate=validate.Range(min=0))
 
 
-class CategoriaProductoCrearSchema(Schema):
+class CategoriaProductoCrearSchema(CodigoMayusculas, Schema):
     nombre = fields.Str(required=True, validate=validate.Length(min=1, max=60))
     prefijo_sku = fields.Str(required=True, validate=CODIGO)
     usa_tallas = fields.Bool(load_default=True)
     activa = fields.Bool(load_default=True)
 
 
-class CategoriaProductoActualizarSchema(Schema):
+class CategoriaProductoActualizarSchema(CodigoMayusculas, Schema):
     nombre = fields.Str(validate=validate.Length(min=1, max=60))
     prefijo_sku = fields.Str(validate=CODIGO)
     usa_tallas = fields.Bool()

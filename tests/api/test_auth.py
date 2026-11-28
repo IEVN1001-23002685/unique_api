@@ -19,6 +19,22 @@ def cabecera_csrf(client):
     return {"X-CSRF-TOKEN": cookie.value}
 
 
+def test_csrf_para_frontend_solo_con_cookie_de_refresco(client, crear_usuario):
+    anonimo = client.get("/api/v1/auth/csrf")
+    assert anonimo.status_code == 200
+    assert anonimo.get_json() == {"csrf": None, "con_refresco": False}
+
+    usuario = crear_usuario()
+    client.post(
+        "/api/v1/auth/login", json={"correo": usuario["correo"], "password": usuario["password"]}
+    )
+    respuesta = client.get("/api/v1/auth/csrf")
+    assert respuesta.status_code == 200
+    datos = respuesta.get_json()
+    assert datos["con_refresco"] is True
+    assert datos["csrf"] == client.get_cookie("csrf_refresh_token").value
+
+
 def test_registro_publico_crea_cliente(client, app):
     respuesta = client.post(
         "/api/v1/auth/registro",

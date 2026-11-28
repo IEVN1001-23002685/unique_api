@@ -292,7 +292,7 @@ def _sembrar_catalogos(contadores):
     return colores, tallas, categorias_producto, categorias_material, disenos
 
 
-def _sembrar_configuracion(contadores):
+def sembrar_configuracion(contadores):
     for clave, valor, descripcion, es_propuesta in CONFIGURACION:
         texto = f"{PENDIENTE_CONFIRMACION} - {descripcion}" if es_propuesta else descripcion
         _insertar_si_falta(
@@ -584,7 +584,7 @@ def seed():
         colores, tallas, categorias_producto, categorias_material, disenos = _sembrar_catalogos(
             contadores
         )
-        _sembrar_configuracion(contadores)
+        sembrar_configuracion(contadores)
         _sembrar_tarifa_y_descuento(contadores)
         materiales = _sembrar_materiales(categorias_material, contadores)
         _sembrar_inventario_material(materiales, colores, contadores)

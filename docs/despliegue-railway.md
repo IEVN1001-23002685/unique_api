@@ -52,8 +52,10 @@ No reutilizar secretos entre entornos ni pegarlos en tickets, logs o documentaci
   (`https://<dominio-real-del-frontend>`). `supports_credentials=True` está activo; un `*` con
   credenciales queda rechazado en el arranque.
 - El login emite una cookie de refresco `httpOnly` y, con CSRF activo, la cookie legible
-  `csrf_refresh_token`. El frontend envía `X-CSRF-TOKEN` desde esa cookie al refrescar y al
-  cerrar sesión. El backend valida el claim `csrf` del JWT aunque lea la cookie manualmente.
+  `csrf_refresh_token`. El frontend envía `X-CSRF-TOKEN` al refrescar y al cerrar sesión. El
+  backend valida el claim `csrf` del JWT aunque lea la cookie manualmente. Como los dominios son
+  distintos, el frontend obtiene ese token de `GET /api/v1/auth/csrf` (CORS al origen exacto) y lo
+  guarda solo en memoria; si la respuesta indica `con_refresco: false`, omite `/auth/refrescar`.
 - El access token viaja en `Authorization: Bearer`; no se emite access token en cookie.
 
 ## 4. Volumen de imágenes
@@ -230,6 +232,41 @@ verificar archivos, usar `--no-verificar-archivos`.
 > incluye, hay que desplegar primero los cambios del repositorio backend; no basta con copiar el
 > JSON.
 
+### Corrección de la galería en una base ya sembrada
+
+`importar_datos_reales.py` empareja por URL y **no reordena** las imágenes que ya existen. Para
+que la variante blanca de la bolsa (`BO-UN-BL`) sea la imagen principal sin duplicar filas:
+
+1. La imagen real blanca viaja en `seed_uploads/` como
+   `84160d6b830aae8b9bc735679c911aae.png`; `docker-entrypoint.sh` la copia al volumen si falta.
+2. `datos_reales.json` y `datos_reales_railway.json` declaran esa URL con `color: BL` y `orden: 0`;
+   la negra pasa a `orden: 1` y la gris a `orden: 2`.
+3. Tras desplegar la imagen, desde el shell de la API:
+
+   ```bash
+   python -m scripts.sincronizar_imagenes_reales datos_reales_railway.json --sku BO
+   python -m scripts.sincronizar_imagenes_reales datos_reales_railway.json --sku BO --aplicar
+   ```
+
+El script crea la fila que falta, corrige `color_id`/`orden` de las existentes y no elimina nada.
+Es idempotente: una segunda ejecución informa 0 creadas y 0 actualizadas. Sin `--aplicar` solo
+muestra el informe. Para todas las imágenes del paquete, omitir `--sku BO`.
+
+### Actualización de una base ya desplegada
+
+Cuando la base de Railway ya tiene datos operativos pero le faltan claves de `configuracion`
+(M22 devuelve `[]`) o tiene la galería desordenada, ejecutar el script que agrupa ambas
+correcciones en una sola transacción:
+
+```bash
+python -m scripts.actualizar_base_existente datos_reales_railway.json --sku BO
+python -m scripts.actualizar_base_existente datos_reales_railway.json --sku BO --aplicar
+```
+
+El script usa el seed de `configuracion` solo para insertar las claves ausentes; **no sobrescribe
+los valores existentes**. Después alinea las imágenes del SKU indicado. Para procesar todos los
+productos del archivo, omitir `--sku BO`. Sin `--aplicar` solo imprime el informe.
+
 7. Verificación mínima:
 
 ```bash
@@ -248,7 +285,7 @@ catálogo y subir una imagen para confirmar que persiste tras reiniciar el servi
 - No ejecutar `flask db downgrade`, `db.drop_all()` ni seeds automáticos en producción.
 - Reiniciar la API no borra el volumen de imágenes. Si se recrea el volumen, copiar antes los
   archivos a un destino seguro.
-- Las 14 imágenes reales publicadas también viajan dentro de la imagen en `seed_uploads/`.
+- Las 15 imágenes reales publicadas también viajan dentro de la imagen en `seed_uploads/`.
   `docker-entrypoint.sh` las copia a `UPLOAD_FOLDER` **solo si faltan**, así que un redeploy
   vuelve a servirlas aunque Railway no tenga un Volume configurado. No sobrescriben imágenes
   subidas después desde el panel de administración.

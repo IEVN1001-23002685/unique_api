@@ -161,6 +161,9 @@ python -m scripts.seed
 python -m scripts.create_admin admin
 ```
 
+Si la base ya estaba sembrada pero le faltan claves de configuración o tiene la galería
+desordenada, usa `python -m scripts.actualizar_base_existente datos_reales_railway.json --sku BO --aplicar`.
+
 7. Verifica `GET /api/v1/health`, `GET /api/v1/health/db` (exige esquema migrado) y un inicio de sesión en `POST /api/v1/auth/login`.
 
 Notas: no instales phpMyAdmin dentro de la API. Si escalas a más de una réplica, configura `RATELIMIT_STORAGE_URI` con `redis://...` y un servicio Redis; `memory://` no se comparte entre instancias. El scheduler mantiene su bloqueo MySQL con un latido de 60 s, verifica la propiedad antes de cada tarea sin reconectar silenciosamente y ejecuta los jobs en un único hilo. Si escribes `DATABASE_URL` manualmente, URL-encodea los caracteres reservados de usuario/contraseña; Railway recomienda usar la referencia privada `MYSQL_URL` dentro del mismo proyecto en vez del endpoint público.

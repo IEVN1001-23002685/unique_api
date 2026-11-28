@@ -4,6 +4,7 @@ from datetime import datetime, time, timedelta
 from decimal import Decimal
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
 from app.models import (
@@ -124,8 +125,16 @@ def crear(catalogo, datos: dict, usuario_id, ip=None) -> dict:
     modelo = _modelo(catalogo)
     _validar_tarifa(catalogo, datos)
     fila = modelo(**{campo: datos[campo] for campo in CAMPOS[catalogo] if campo in datos})
-    db.session.add(fila)
-    db.session.flush()
+    try:
+        db.session.add(fila)
+        db.session.flush()
+    except IntegrityError as error:
+        db.session.rollback()
+        raise ApiError(
+            "CATALOGO_DUPLICADO",
+            "Ya existe un elemento de este catálogo con el mismo nombre o código.",
+            409,
+        ) from error
     registrar_bitacora(
         usuario_id,
         "CATALOGO_CREADO",
@@ -202,7 +211,15 @@ def actualizar(catalogo, elemento_id: int, datos: dict, usuario_id, ip=None) -> 
         {"campos": sorted(datos)},
         ip,
     )
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError as error:
+        db.session.rollback()
+        raise ApiError(
+            "CATALOGO_DUPLICADO",
+            "Ya existe un elemento de este catálogo con el mismo nombre o código.",
+            409,
+        ) from error
     return _serializar(fila, catalogo)
 
 

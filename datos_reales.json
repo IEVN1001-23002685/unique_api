@@ -50,16 +50,22 @@
       ],
       "imagenes": [
         {
+          "url": "/uploads/84160d6b830aae8b9bc735679c911aae.png",
+          "archivo": "84160d6b830aae8b9bc735679c911aae.png",
+          "color": "BL",
+          "orden": 0
+        },
+        {
           "url": "/uploads/132245d47e1a4ec0dbac31e377f2656f.png",
           "archivo": "132245d47e1a4ec0dbac31e377f2656f.png",
           "color": "NG",
-          "orden": 0
+          "orden": 1
         },
         {
           "url": "/uploads/3cadd2d783e143e52ada5b8941bb7d5b.png",
           "archivo": "3cadd2d783e143e52ada5b8941bb7d5b.png",
           "color": "GR",
-          "orden": 1
+          "orden": 2
         }
       ],
       "recetas": [

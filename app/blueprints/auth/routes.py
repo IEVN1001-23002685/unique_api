@@ -35,6 +35,22 @@ def _valor_csrf():
     return valor
 
 
+@auth_bp.get("/csrf")
+def csrf_para_frontend():
+    """Expone el token de doble envío al origen autorizado; las cookies de la API no son
+    legibles por JavaScript cuando el frontend está en otro dominio."""
+    nombre_refresco = current_app.config.get("JWT_REFRESH_COOKIE_NAME", "refresh_token")
+    con_refresco = bool(request.cookies.get(nombre_refresco))
+    if not current_app.config.get("JWT_COOKIE_CSRF_PROTECT", True):
+        return jsonify({"csrf": None, "con_refresco": con_refresco})
+    return jsonify(
+        {
+            "csrf": request.cookies.get(f"csrf_{nombre_refresco}"),
+            "con_refresco": con_refresco,
+        }
+    )
+
+
 @auth_bp.post("/registro")
 @limiter.limit("5 per minute")
 def registro():

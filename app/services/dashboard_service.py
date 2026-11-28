@@ -1,7 +1,8 @@
 """Indicadores del dashboard a partir de vistas y consultas agregadas (M20)."""
 
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select, text, true
 
@@ -24,8 +25,17 @@ from app.models import (
 from app.services.configuracion_service import valor_entero
 
 
+ZONA_LOCAL = ZoneInfo("America/Mexico_City")
+
+
+def _inicio_utc(dia):
+    """Medianoche local de México convertida a UTC naive, como se guarda en MySQL."""
+    local = datetime.combine(dia, time.min, tzinfo=ZONA_LOCAL)
+    return local.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 def _inicio_dia():
-    return datetime.combine(date.today(), time.min)
+    return _inicio_utc(date.today())
 
 
 def _dinero(valor) -> str:
@@ -41,20 +51,30 @@ def _texto(valor) -> str:
 
 
 def _rango(filtros, columna):
+    """Rango de dias locales sobre columnas DATETIME almacenadas en UTC naive."""
     condicion = true()
     if filtros.get("desde"):
-        condicion = condicion & (columna >= datetime.combine(filtros["desde"], time.min))
+        condicion = condicion & (columna >= _inicio_utc(filtros["desde"]))
     if filtros.get("hasta"):
-        condicion = condicion & (
-            columna < datetime.combine(filtros["hasta"] + timedelta(days=1), time.min)
-        )
+        condicion = condicion & (columna < _inicio_utc(filtros["hasta"] + timedelta(days=1)))
     return condicion
 
 
-def _conteos_estado(modelo, campo, estados):
-    filas = db.session.execute(
-        select(campo, func.count()).group_by(campo)
-    ).all()
+def _rango_fecha(filtros, columna):
+    """Rango inclusivo sobre columnas DATE, que no requieren conversion de zona."""
+    condicion = true()
+    if filtros.get("desde"):
+        condicion = condicion & (columna >= filtros["desde"])
+    if filtros.get("hasta"):
+        condicion = condicion & (columna <= filtros["hasta"])
+    return condicion
+
+
+def _conteos_estado(modelo, campo, estados, condicion=None):
+    consulta = select(campo, func.count()).group_by(campo)
+    if condicion is not None:
+        consulta = consulta.where(condicion)
+    filas = db.session.execute(consulta).all()
     conteo = {str(estado): 0 for estado in estados}
     for estado, total in filas:
         if str(estado) in conteo:
@@ -89,23 +109,33 @@ def _kpis_base(filtros) -> dict:
         "ticket_promedio": _dinero(Decimal(ingresos) / activas) if activas else "0.00",
         "pedidos_activos": _numero(
             db.session.scalar(
-                select(func.count()).where(Pedido.estado.notin_(("ENTREGADO", "CANCELADO")))
+                select(func.count()).where(
+                    _rango(filtros, Pedido.fecha),
+                    Pedido.estado.notin_(("ENTREGADO", "CANCELADO")),
+                )
             )
         ),
         "pedidos_entregados": _numero(
             db.session.scalar(
-                select(func.count()).where(Pedido.estado == "ENTREGADO")
+                select(func.count()).where(
+                    _rango(filtros, Pedido.fecha), Pedido.estado == "ENTREGADO"
+                )
             )
         ),
         "ordenes_produccion_activas": _numero(
             db.session.scalar(
                 select(func.count()).where(
-                    OrdenProduccion.estado.in_(("PLANEADA", "LISTA", "EN_PROCESO", "EN_REVISION"))
+                    _rango(filtros, OrdenProduccion.creado_en),
+                    OrdenProduccion.estado.in_(("PLANEADA", "LISTA", "EN_PROCESO", "EN_REVISION")),
                 )
             )
         ),
         "alertas_abiertas": _numero(
-            db.session.scalar(select(func.count()).where(Alerta.estado == "ABIERTA"))
+            db.session.scalar(
+                select(func.count()).where(
+                    _rango(filtros, Alerta.creado_en), Alerta.estado == "ABIERTA"
+                )
+            )
         ),
         "variantes_bajo_minimo": _numero(
             db.session.scalar(
@@ -177,12 +207,14 @@ def ventas(filtros=None) -> dict:
             text(
                 "SELECT fecha, sku, nombre_producto, categoria, talla, color, unidades, ingresos "
                 "FROM v_ventas_sku WHERE (:desde IS NULL OR fecha >= :desde) "
-                "AND (:hasta IS NULL OR fecha <= :hasta) "
+                "AND (:hasta IS NULL OR fecha < :hasta_exclusivo) "
                 "ORDER BY ingresos DESC, unidades DESC LIMIT 10"
             ),
             {
-                "desde": filtros["desde"].isoformat() if filtros.get("desde") else None,
-                "hasta": filtros["hasta"].isoformat() if filtros.get("hasta") else None,
+                "desde": filtros.get("desde"),
+                "hasta_exclusivo": (
+                    filtros["hasta"] + timedelta(days=1) if filtros.get("hasta") else None
+                ),
             },
         ).all()
     ]
@@ -191,36 +223,38 @@ def ventas(filtros=None) -> dict:
 
 def produccion(filtros=None, rol=None) -> dict:
     filtros = filtros or {}
+    condicion = _rango(filtros, OrdenProduccion.creado_en)
+
+    def total_lineas(columna):
+        return _numero(
+            db.session.scalar(
+                select(func.coalesce(func.sum(columna), 0))
+                .join(OrdenProduccion, OrdenProduccion.id == OrdenProduccionLinea.orden_id)
+                .where(condicion)
+            )
+        )
+
     datos = {
         "por_estado": _conteos_estado(
             OrdenProduccion,
             OrdenProduccion.estado,
             ("PLANEADA", "LISTA", "EN_PROCESO", "EN_REVISION", "CERRADA", "CANCELADA"),
+            condicion,
         ),
         "por_semaforo": _conteos_estado(
             OrdenProduccion,
             OrdenProduccion.semaforo,
             ("VERDE", "AMBAR", "ROJO"),
+            condicion,
         ),
-        "unidades_planeadas": _numero(
-            db.session.scalar(
-                select(func.coalesce(func.sum(OrdenProduccionLinea.cantidad_planeada), 0))
-            )
-        ),
-        "unidades_aprobadas": _numero(
-            db.session.scalar(
-                select(func.coalesce(func.sum(OrdenProduccionLinea.cantidad_aprobada), 0))
-            )
-        ),
-        "unidades_reproceso": _numero(
-            db.session.scalar(
-                select(func.coalesce(func.sum(OrdenProduccionLinea.cantidad_reproceso), 0))
-            )
-        ),
+        "unidades_planeadas": total_lineas(OrdenProduccionLinea.cantidad_planeada),
+        "unidades_aprobadas": total_lineas(OrdenProduccionLinea.cantidad_aprobada),
+        "unidades_reproceso": total_lineas(OrdenProduccionLinea.cantidad_reproceso),
     }
     datos["ordenes_vencidas"] = _numero(
         db.session.scalar(
             select(func.count()).where(
+                _rango_fecha(filtros, OrdenProduccion.fecha_requerida),
                 OrdenProduccion.fecha_requerida < date.today(),
                 OrdenProduccion.estado.in_(("PLANEADA", "LISTA", "EN_PROCESO", "EN_REVISION")),
             )
@@ -249,8 +283,15 @@ def abastecimiento(filtros=None, rol=None) -> dict:
             OrdenCompra,
             OrdenCompra.estado,
             ("PENDIENTE", "EMITIDA", "PARCIAL", "RECIBIDA", "CANCELADA"),
+            _rango(filtros, OrdenCompra.fecha_emision),
         ),
-        "recepciones": _numero(db.session.scalar(select(func.count()).select_from(Recepcion))),
+        "recepciones": _numero(
+            db.session.scalar(
+                select(func.count())
+                .select_from(Recepcion)
+                .where(_rango(filtros, Recepcion.fecha))
+            )
+        ),
     }
     datos["dias_abastecimiento"] = valor_entero("dias_produccion_estandar", 5)
     return datos
@@ -263,14 +304,20 @@ def logistica(filtros=None, rol=None) -> dict:
             Preparacion,
             Preparacion.estado,
             ("POR_SURTIR", "EN_PICKING", "EN_VERIFICACION", "EN_EMPAQUE", "LISTA"),
+            _rango(filtros, Preparacion.creado_en),
         ),
         "entregas": _conteos_estado(
             Entrega,
             Entrega.estado,
             ("PROGRAMADA", "EN_RUTA", "ENTREGADA", "FALLIDA", "CANCELADA"),
+            _rango(filtros, Entrega.creado_en),
         ),
         "pedidos_listo_envio": _numero(
-            db.session.scalar(select(func.count()).where(Pedido.estado == "LISTO_ENVIO"))
+            db.session.scalar(
+                select(func.count()).where(
+                    _rango(filtros, Pedido.fecha), Pedido.estado == "LISTO_ENVIO"
+                )
+            )
         ),
         "repartidores_activos": _numero(
             db.session.scalar(
@@ -284,6 +331,11 @@ def logistica(filtros=None, rol=None) -> dict:
     datos["entregas_programadas_hoy"] = _numero(
         db.session.scalar(
             select(func.count()).where(Entrega.fecha_programada == date.today())
+        )
+    )
+    datos["entregas_programadas_periodo"] = _numero(
+        db.session.scalar(
+            select(func.count()).where(_rango_fecha(filtros, Entrega.fecha_programada))
         )
     )
     return datos

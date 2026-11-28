@@ -57,6 +57,7 @@ Ejecuta `SELECT 1`. No expone SQL, host, credenciales ni trazas.
 | `POST` | `/auth/logout` | autenticado | Cookie `refresh_token`, cabecera `X-CSRF-TOKEN` y Bearer | `200`, revoca el refresco |
 | `POST` | `/auth/recuperar` | P | `correo` | `200`, mensaje genérico |
 | `POST` | `/auth/restablecer` | P | `token`, `password` | `200` |
+| `GET` | `/auth/csrf` | P | Ninguna; requiere `Origin` autorizado por CORS | `200`, `{ csrf, con_refresco }` |
 
 Errores habituales: `400 VALIDACION`, `401 CREDENCIALES_INVALIDAS`/`SESION_INVALIDA`,
 `403 CUENTA_NO_ACTIVA`, `409 CORREO_REGISTRADO`, `429 DEMASIADOS_INTENTOS`.
@@ -68,6 +69,10 @@ Errores habituales: `400 VALIDACION`, `401 CREDENCIALES_INVALIDAS`/`SESION_INVAL
   backend valida el doble envío en `/auth/refrescar` y `/auth/logout` cuando la cookie de refresco
   se lee manualmente. El frontend envía `X-CSRF-TOKEN` desde la cookie legible
   `csrf_refresh_token`; las rutas protegidas usan el access token en `Authorization`.
+- En producción el frontend está en otro dominio y `document.cookie` no puede leer la cookie de la
+  API. `GET /auth/csrf` devuelve el token al origen autorizado por CORS para que el frontend lo
+  mantenga solo en memoria y pueda refrescar o cerrar sesión. `con_refresco` permite omitir
+  `/auth/refrescar` cuando el visitante es anónimo, evitando un 401 innecesario.
 - La misma clave de refresco solo sirve una vez; al usarla se emite una nueva y la anterior queda revocada.
 - El frontend serializa los refrescos (`single-flight`): una sola petición `/auth/refrescar`
   por lote de 401 y cabecera `X-Auth-Refresco-Intentado` para no repetir indefinidamente. Si el

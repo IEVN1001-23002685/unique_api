@@ -20,7 +20,14 @@ def _filtros():
             "Parámetros inválidos",
             400,
             [
-                {"campo": str(campo), "mensaje": str(mensaje)}
+                {
+                    "campo": str(campo),
+                    "mensaje": (
+                        " ".join(str(item) for item in mensaje)
+                        if isinstance(mensaje, list)
+                        else str(mensaje)
+                    ),
+                }
                 for campo, mensaje in error.messages.items()
             ],
         )
