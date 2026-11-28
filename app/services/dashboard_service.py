@@ -110,7 +110,7 @@ def _kpis_base(filtros) -> dict:
         "pedidos_activos": _numero(
             db.session.scalar(
                 select(func.count()).where(
-                    _rango(filtros, Pedido.fecha),
+                    _rango(filtros, Pedido.creado_en),
                     Pedido.estado.notin_(("ENTREGADO", "CANCELADO")),
                 )
             )
@@ -118,7 +118,7 @@ def _kpis_base(filtros) -> dict:
         "pedidos_entregados": _numero(
             db.session.scalar(
                 select(func.count()).where(
-                    _rango(filtros, Pedido.fecha), Pedido.estado == "ENTREGADO"
+                    _rango(filtros, Pedido.creado_en), Pedido.estado == "ENTREGADO"
                 )
             )
         ),
@@ -315,7 +315,7 @@ def logistica(filtros=None, rol=None) -> dict:
         "pedidos_listo_envio": _numero(
             db.session.scalar(
                 select(func.count()).where(
-                    _rango(filtros, Pedido.fecha), Pedido.estado == "LISTO_ENVIO"
+                    _rango(filtros, Pedido.creado_en), Pedido.estado == "LISTO_ENVIO"
                 )
             )
         ),

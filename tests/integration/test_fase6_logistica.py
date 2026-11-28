@@ -410,6 +410,18 @@ def test_m20_dashboard_segun_rol_y_exportacion_csv(
     for ruta in ("resumen", "ventas", "produccion", "abastecimiento", "logistica"):
         respuesta = client.get(f"/api/v1/dashboard/{ruta}", headers=headers_admin)
         assert respuesta.status_code == 200, (ruta, respuesta.get_json())
+
+    filtrado = client.get(
+        "/api/v1/dashboard/resumen",
+        query_string={"desde": "2026-01-01", "hasta": "2026-12-31"},
+        headers=headers_admin,
+    )
+    assert filtrado.status_code == 200, filtrado.get_json()
+    assert filtrado.get_json()["periodo"] == {
+        "desde": "2026-01-01",
+        "hasta": "2026-12-31",
+    }
+
     exportacion = client.get("/api/v1/dashboard/exportar", headers=headers_admin)
     assert exportacion.status_code == 200
     assert exportacion.mimetype.startswith("text/csv")
