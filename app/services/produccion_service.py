@@ -855,6 +855,7 @@ def asignar_pt_a_pedidos(variante_id, cantidad, usuario_id, orden_id=None) -> li
                 True,
                 usuario_id,
             )
+            pedido_service.crear_preparacion(pedido)
     return asignaciones
 
 

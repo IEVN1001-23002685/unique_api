@@ -30,7 +30,9 @@ from app.models import (
     DisenoBordado,
     EmpaqueRegla,
     InventarioMaterial,
+    LoteMaterial,
     Material,
+    MovimientoMaterial,
     Producto,
     Receta,
     RecetaBordado,
@@ -42,6 +44,7 @@ from app.models import (
     Usuario,
     VarianteProducto,
 )
+from app.utils.folios import generar_folio
 
 logger = logging.getLogger(__name__)
 
@@ -542,6 +545,76 @@ def _sembrar_reglas_empaque(materiales, contadores):
         )
 
 
+def _sembrar_lotes_empaque(materiales, contadores):
+    color_na = _obtener(Color, codigo="NA")
+    ahora = datetime.now(timezone.utc)
+    cantidad = _decimal("200")
+    usuario_movimiento = None
+    usuario_resuelto = False
+
+    for codigo in ("EMP-BOL", "EMP-PAP", "EMP-TAR", "EMP-ETE"):
+        material = materiales[codigo]
+        inventario = _obtener(
+            InventarioMaterial, material_id=material.id, color_id=color_na.id
+        )
+        filtros_lote = {
+            "inventario_material_id": inventario.id,
+            "recepcion_linea_id": None,
+            "proveedor_id": None,
+        }
+        if db.session.query(LoteMaterial).filter_by(**filtros_lote).first() is not None:
+            continue
+
+        lote, creado = _insertar_si_falta(
+            LoteMaterial,
+            filtros_lote,
+            {
+                "folio": generar_folio("LT"),
+                "fecha_entrada": ahora.date(),
+                "cantidad_base_recibida": cantidad,
+                "cantidad_base_disponible": cantidad,
+                "costo_unitario_base": material.costo_estandar_base,
+                "costo_total": (
+                    cantidad * _decimal(material.costo_estandar_base)
+                ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+                "estado": "DISPONIBLE",
+            },
+            contadores,
+            "lotes_empaque",
+        )
+        if not creado:
+            continue
+
+        if not usuario_resuelto:
+            try:
+                usuario_movimiento = _creador_de_recetas()
+            except RuntimeError as error:
+                logger.warning("Se omiten movimientos de empaque: %s", error)
+                usuario_movimiento = None
+            usuario_resuelto = True
+        if usuario_movimiento is None:
+            continue
+
+        _insertar_si_falta(
+            MovimientoMaterial,
+            {
+                "lote_id": lote.id,
+                "tipo": "ENTRADA",
+                "documento_tipo": "SEMILLA",
+                "documento_id": lote.id,
+            },
+            {
+                "cantidad_base": cantidad,
+                "costo_unitario_base": material.costo_estandar_base,
+                "motivo": "Stock inicial de empaque para demostración",
+                "usuario_id": usuario_movimiento,
+                "fecha": ahora.replace(tzinfo=None),
+            },
+            contadores,
+            "movimientos_empaque",
+        )
+
+
 def _sembrar_usuarios(contadores):
     hasher = PasswordHasher()
     for variable_correo, variable_clave, codigo_rol, nombre in USUARIOS_INICIALES:
@@ -592,6 +665,7 @@ def seed():
         _sembrar_usuarios(contadores)
         _sembrar_recetas(productos, tallas, materiales, disenos, contadores)
         _sembrar_reglas_empaque(materiales, contadores)
+        _sembrar_lotes_empaque(materiales, contadores)
         db.session.commit()
     except Exception:
         db.session.rollback()

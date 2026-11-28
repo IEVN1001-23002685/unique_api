@@ -1,6 +1,6 @@
 """Esquemas de entregas, hojas de reparto y repartidores (M19)."""
 
-from marshmallow import Schema, fields, validate
+from marshmallow import EXCLUDE, Schema, fields, validate
 
 ESTADOS = ["PROGRAMADA", "EN_RUTA", "ENTREGADA", "FALLIDA", "CANCELADA"]
 MOTIVOS = ["AUSENTE", "DIRECCION_INCORRECTA", "RECHAZADO", "OTRO"]
@@ -18,6 +18,18 @@ class EntregaResultadoSchema(Schema):
     receptor = fields.Str(allow_none=True, validate=validate.Length(max=100))
     motivo_fallo = fields.Str(allow_none=True, validate=validate.OneOf(MOTIVOS))
     notas = fields.Str(allow_none=True, validate=validate.Length(max=500))
+
+
+class EntregaFiltrosSchema(Schema):
+    estado = fields.Str(validate=validate.OneOf(ESTADOS))
+    repartidor_id = fields.Int(validate=validate.Range(min=1))
+    pedido_id = fields.Int(validate=validate.Range(min=1))
+    folio = fields.Str(validate=validate.Length(max=20))
+    desde = fields.Date()
+    hasta = fields.Date()
+
+    class Meta:
+        unknown = EXCLUDE
 
 
 class EntregaSchema(Schema):

@@ -5,6 +5,7 @@ from marshmallow import ValidationError
 
 from app.schemas import (
     EntregaCrearSchema,
+    EntregaFiltrosSchema,
     EntregaResultadoSchema,
     EntregaSchema,
     HojaRepartoSchema,
@@ -95,6 +96,14 @@ def productos_repartidos():
     return jsonify(
         entrega_service.productos_repartidos(filtros, pagina, por_pagina)
     )
+
+
+@entregas_bp.get("/entregas")
+@roles_requeridos("OPERATIVO")
+def listar_entregas():
+    filtros = _filtros(EntregaFiltrosSchema())
+    pagina, por_pagina = parametros_paginacion()
+    return jsonify(entrega_service.listar(filtros, pagina, por_pagina))
 
 
 @entregas_bp.post("/entregas")

@@ -70,6 +70,7 @@ from app.schemas.cuenta import (
 )
 from app.schemas.entrega import (
     EntregaCrearSchema,
+    EntregaFiltrosSchema,
     EntregaResultadoSchema,
     EntregaSchema,
     HojaRepartoSchema,
@@ -275,6 +276,7 @@ __all__ = [
     "DevolucionSchema",
     "DireccionActualizarSchema",
     "EntregaCrearSchema",
+    "EntregaFiltrosSchema",
     "EntregaResultadoSchema",
     "EntregaSchema",
     "EtiquetaSchema",

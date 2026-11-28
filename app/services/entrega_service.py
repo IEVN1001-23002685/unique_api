@@ -73,6 +73,35 @@ def serializar(entrega: Entrega) -> dict:
     }
 
 
+def listar(filtros=None, pagina=1, por_pagina=20) -> dict:
+    filtros = filtros or {}
+    consulta = select(Entrega)
+    if filtros.get("estado"):
+        consulta = consulta.where(Entrega.estado == filtros["estado"])
+    if filtros.get("repartidor_id"):
+        consulta = consulta.where(Entrega.repartidor_id == filtros["repartidor_id"])
+    if filtros.get("pedido_id"):
+        consulta = consulta.where(Entrega.pedido_id == filtros["pedido_id"])
+    if filtros.get("folio"):
+        consulta = consulta.where(Entrega.folio == filtros["folio"])
+    if filtros.get("desde"):
+        consulta = consulta.where(Entrega.fecha_programada >= filtros["desde"])
+    if filtros.get("hasta"):
+        consulta = consulta.where(Entrega.fecha_programada <= filtros["hasta"])
+    total = db.session.scalar(select(func.count()).select_from(consulta.subquery())) or 0
+    entregas = db.session.execute(
+        consulta.order_by(Entrega.fecha_programada.desc(), Entrega.id.desc())
+        .offset((pagina - 1) * por_pagina)
+        .limit(por_pagina)
+    ).scalars().all()
+    return {
+        "items": [serializar(entrega) for entrega in entregas],
+        "total": total,
+        "pagina": pagina,
+        "por_pagina": por_pagina,
+    }
+
+
 def por_asignar(filtros=None, pagina=1, por_pagina=20) -> dict:
     filtros = filtros or {}
     consulta = (
